@@ -2,55 +2,76 @@ import { animateLoader, animateMenuEntrance, animateToast, stopLoader } from './
 
 function createAppContainer() {
   const container = document.createElement('div');
-  container.className = 'app-shell relative isolate';
+  container.className = 'app-shell';
   container.innerHTML = `
-    <div class="pointer-events-none absolute inset-0 bg-hero-glow"></div>
-    <div id="toast-root" class="toast-stack fixed right-4 top-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 sm:right-6 sm:top-6"></div>
-    <main id="screen-root" class="relative mx-auto min-h-screen max-w-6xl px-4 pb-10 pt-6 sm:px-6 lg:px-8"></main>
+    <div id="toast-root" class="toast-stack fixed right-4 top-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2"></div>
+    <main id="screen-root" class="relative w-full h-full"></main>
+    <nav class="bottom-nav">
+      <div class="flex items-center justify-around py-2">
+        <button class="bottom-nav-item active flex flex-col items-center gap-1 px-4 py-2">
+          <i class="fa-solid fa-utensils text-xl"></i>
+          <span class="text-xs font-semibold">Menu</span>
+        </button>
+        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+          <i class="fa-solid fa-shopping-bag text-xl"></i>
+          <span class="text-xs font-semibold">Panier</span>
+        </button>
+        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+          <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+          <span class="text-xs font-semibold">Commandes</span>
+        </button>
+        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+          <i class="fa-solid fa-user text-xl"></i>
+          <span class="text-xs font-semibold">Compte</span>
+        </button>
+      </div>
+    </nav>
   `;
 
   return container;
 }
 
-function createHeaderMarkup(categories) {
-  const chips = categories.map((category) => `
-    <a
-      href="#category-${slugify(category)}"
-      class="rounded-full border border-white/60 bg-white/70 px-4 py-2 text-sm font-semibold text-ink/75 transition hover:border-gold hover:text-ink"
-    >${category}</a>
+function createTopBarMarkup(categories, totalItems) {
+  const tabs = categories.map((category, index) => `
+    <button
+      data-category-tab="${slugify(category)}"
+      class="category-tab px-4 py-2 text-sm font-semibold transition ${index === 0 ? 'active' : 'text-white/80'}"
+    >
+      ${category}
+    </button>
   `).join('');
 
   return `
-    <section data-hero class="grid gap-6 pb-8 pt-4 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-10 lg:pb-12">
-      <div class="space-y-5">
-        <p class="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-wine shadow-soft">
-          <i class="fa-solid fa-wine-glass"></i>
-          Experience QRCommande
-        </p>
-        <div class="space-y-4">
-          <h1 class="font-display text-5xl font-semibold leading-none text-ink sm:text-6xl lg:text-7xl">
-            Un menu digital pensé pour les événements haut de gamme.
-          </h1>
-          <p class="max-w-2xl text-sm leading-7 text-ink/70 sm:text-base">
-            Découvrez la sélection du moment, catégorie par catégorie, puis ajoutez vos envies en quelques secondes depuis votre téléphone.
-          </p>
-        </div>
-      </div>
-      <div class="glass-panel rounded-[2rem] border border-white/60 p-6 shadow-soft sm:p-8">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.3em] text-wine/80">Événement en direct</p>
-            <p class="mt-3 font-display text-3xl font-semibold text-ink">Service fluide, interface instantanée</p>
+    <div class="top-app-bar">
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <i class="fa-solid fa-qrcode text-white text-lg"></i>
+            </div>
+            <div>
+              <h1 class="text-white font-bold text-lg">QRCommande</h1>
+              <p class="text-white/80 text-xs">${totalItems} articles disponibles</p>
+            </div>
           </div>
-          <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-pine text-lg text-white">
-            <i class="fa-solid fa-qrcode"></i>
-          </span>
+          <button class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white">
+            <i class="fa-solid fa-bell"></i>
+          </button>
         </div>
-        <div class="mt-6 flex flex-wrap gap-3">
-          ${chips}
+        <div class="search-bar flex items-center gap-3 px-4 py-2.5">
+          <i class="fa-solid fa-search text-white/70"></i>
+          <input
+            type="text"
+            placeholder="Rechercher un article..."
+            class="flex-1 bg-transparent text-white placeholder-white/60 outline-none text-sm"
+            id="search-input"
+          />
         </div>
       </div>
-    </section>
+      <div class="category-tabs px-4 pb-3">
+        ${tabs}
+      </div>
+    </div>
   `;
 }
 
@@ -69,48 +90,42 @@ function renderArticleCard(article) {
   return `
     <article
       data-article-card
-      class="article-card rounded-[1.75rem] border px-5 py-5 shadow-soft transition duration-300 ${
-        isAvailable
-          ? 'border-white/70 bg-white/80 hover:-translate-y-1 hover:border-gold/50'
-          : 'article-card--disabled border-black/5 bg-black/5 opacity-70'
-      }"
+      class="article-card ${isAvailable ? 'available' : 'unavailable'}"
     >
-      <div class="flex items-start justify-between gap-4">
-        <div class="space-y-2">
-          <p class="font-display text-3xl font-semibold text-ink">${article.name}</p>
-          <p class="inline-flex items-center gap-2 text-sm font-medium text-ink/60">
-            <i class="fa-solid fa-tag text-gold"></i>
-            ${article.category}
-          </p>
+      <div class="p-4">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="flex-1 min-w-0">
+            <h3 class="font-bold text-gray-900 text-base mb-1.5 leading-tight truncate">${article.name}</h3>
+            <span class="category-label">
+              <i class="fa-solid fa-tag text-xs"></i>
+              ${article.category}
+            </span>
+          </div>
+          <span class="status-badge ${isAvailable ? 'available' : 'unavailable'} flex-shrink-0">
+            ${isAvailable ? 'Dispo' : 'Épuisé'}
+          </span>
         </div>
-        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
-          isAvailable
-            ? 'bg-pine/10 text-pine'
-            : 'bg-black/10 text-ink/55'
-        }">
-          ${isAvailable ? 'Disponible' : 'Indisponible'}
-        </span>
-      </div>
-      <div class="mt-6 flex items-center justify-between gap-4">
-        <p class="text-sm leading-6 text-ink/60">
-          ${isAvailable
-            ? 'Ajoutez cet article à votre sélection en un geste.'
-            : 'Cet article n’est pas proposé pour le moment.'}
-        </p>
-        <button
-          type="button"
-          class="rounded-full px-4 py-2 text-sm font-semibold transition ${
-            isAvailable
-              ? 'bg-ink text-white hover:bg-wine'
-              : 'cursor-not-allowed bg-black/10 text-ink/40'
-          }"
-          ${isAvailable ? '' : 'disabled'}
-          data-add-button
-          data-article-name="${article.name}"
-        >
-          <i class="fa-solid fa-plus mr-2"></i>
-          Ajouter
-        </button>
+        
+        <div class="flex items-center justify-between gap-3 mt-4">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-clock text-gray-400 text-xs"></i>
+            <span class="text-xs text-gray-500">Rapide</span>
+          </div>
+          <button
+            type="button"
+            class="add-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition ${
+              isAvailable
+                ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }"
+            ${isAvailable ? '' : 'disabled'}
+            data-add-button
+            data-article-name="${article.name}"
+          >
+            <i class="fa-solid fa-plus"></i>
+            <span>Ajouter</span>
+          </button>
+        </div>
       </div>
     </article>
   `;
@@ -140,18 +155,15 @@ export function mountBaseLayout(rootElement) {
 
 export function renderLoader(screenRoot) {
   screenRoot.innerHTML = `
-    <section class="flex min-h-screen flex-col items-center justify-center gap-8 text-center">
-      <div class="glass-panel rounded-[2rem] border border-white/70 px-10 py-12 shadow-soft">
-        <div class="mx-auto loader-ring"></div>
-        <div class="mt-6 space-y-3">
-          <p class="text-xs font-semibold uppercase tracking-[0.4em] text-wine/75">Chargement du menu</p>
-          <h2 class="font-display text-4xl font-semibold text-ink">Préparation de l’expérience</h2>
-          <p class="max-w-md text-sm leading-7 text-ink/65">
-            Nous synchronisons la carte des articles et l’état de l’événement.
-          </p>
+    <div class="flex flex-col items-center justify-center h-full bg-gradient-to-br from-purple-50 to-purple-100">
+      <div class="text-center">
+        <div class="mx-auto loader-ring animate-spin"></div>
+        <div class="mt-6 space-y-2">
+          <h2 class="text-xl font-bold text-gray-800">Chargement du menu</h2>
+          <p class="text-sm text-gray-600">Préparation en cours...</p>
         </div>
       </div>
-    </section>
+    </div>
   `;
 
   const loader = screenRoot.querySelector('.loader-ring');
@@ -161,62 +173,108 @@ export function renderLoader(screenRoot) {
 
 export function renderInactiveState(screenRoot) {
   screenRoot.innerHTML = `
-    <section class="flex min-h-screen items-center justify-center">
-      <div class="glass-panel w-full max-w-2xl rounded-[2rem] border border-white/80 px-8 py-14 text-center shadow-soft sm:px-12">
-        <span class="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-full bg-wine text-2xl text-white shadow-soft">
-          <i class="fa-regular fa-clock"></i>
-        </span>
-        <p class="mt-8 text-xs font-semibold uppercase tracking-[0.35em] text-wine/75">QRCommande</p>
-        <h1 class="mt-4 font-display text-5xl font-semibold text-ink sm:text-6xl">L’événement n’est pas encore actif</h1>
-        <p class="mx-auto mt-5 max-w-lg text-sm leading-7 text-ink/65 sm:text-base">
-          Revenez dans quelques instants. Le service sera disponible dès l’ouverture officielle de l’événement.
+    <div class="flex items-center justify-center h-full bg-gradient-to-br from-purple-50 to-purple-100 p-6">
+      <div class="bg-white rounded-3xl p-8 shadow-2xl text-center max-w-md">
+        <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-orange-400 to-orange-500 flex items-center justify-center shadow-lg">
+          <i class="fa-regular fa-clock text-3xl text-white"></i>
+        </div>
+        <h1 class="mt-6 text-2xl font-bold text-gray-800">Événement non actif</h1>
+        <p class="mt-3 text-gray-600 text-sm leading-relaxed">
+          L'événement n'a pas encore commencé. Revenez dans quelques instants.
         </p>
       </div>
-    </section>
+    </div>
   `;
 }
 
 export function renderErrorState(screenRoot, message) {
   screenRoot.innerHTML = `
-    <section class="flex min-h-screen items-center justify-center">
-      <div class="glass-panel w-full max-w-2xl rounded-[2rem] border border-white/80 px-8 py-14 text-center shadow-soft sm:px-12">
-        <span class="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-full bg-ink text-2xl text-white shadow-soft">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-        </span>
-        <h1 class="mt-8 font-display text-5xl font-semibold text-ink sm:text-6xl">Chargement indisponible</h1>
-        <p class="mx-auto mt-5 max-w-lg text-sm leading-7 text-ink/65 sm:text-base">${message}</p>
+    <div class="flex items-center justify-center h-full bg-gradient-to-br from-red-50 to-red-100 p-6">
+      <div class="bg-white rounded-3xl p-8 shadow-2xl text-center max-w-md">
+        <div class="w-20 h-20 mx-auto rounded-full bg-gradient-to-r from-red-400 to-red-500 flex items-center justify-center shadow-lg">
+          <i class="fa-solid fa-triangle-exclamation text-3xl text-white"></i>
+        </div>
+        <h1 class="mt-6 text-2xl font-bold text-gray-800">Erreur de chargement</h1>
+        <p class="mt-3 text-gray-600 text-sm leading-relaxed">${message}</p>
+        <button class="mt-6 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold rounded-xl shadow-lg">
+          Réessayer
+        </button>
       </div>
-    </section>
+    </div>
   `;
 }
 
 export function renderMenu(screenRoot, articles) {
   const categoriesMap = groupArticlesByCategory(articles);
   const categories = Object.keys(categoriesMap).sort((left, right) => left.localeCompare(right, 'fr'));
+  const totalItems = articles.length;
 
   screenRoot.innerHTML = `
-    ${createHeaderMarkup(categories)}
-    <section class="space-y-8 pb-10">
-      ${categories.map((category) => `
-        <section
-          id="category-${slugify(category)}"
-          data-category-block
-          class="category-anchor space-y-5"
-        >
-          <div class="flex items-end justify-between gap-4 border-b border-ink/10 pb-4">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-wine/70">Catégorie</p>
-              <h2 class="mt-2 font-display text-4xl font-semibold text-ink">${category}</h2>
+    ${createTopBarMarkup(categories, totalItems)}
+    <div class="main-content bg-gray-50">
+      <div class="px-4 pt-4 pb-6 space-y-6">
+        ${categories.map((category) => `
+          <section
+            id="category-${slugify(category)}"
+            data-category-block
+            class="space-y-3"
+          >
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-bold text-gray-800">${category}</h2>
+              <span class="text-xs text-gray-500 font-medium">${categoriesMap[category].length} article${categoriesMap[category].length > 1 ? 's' : ''}</span>
             </div>
-            <p class="text-sm text-ink/55">${categoriesMap[category].length} article${categoriesMap[category].length > 1 ? 's' : ''}</p>
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            ${categoriesMap[category].map((article) => renderArticleCard(article)).join('')}
-          </div>
-        </section>
-      `).join('')}
-    </section>
+            <div class="grid gap-3 grid-cols-1 sm:grid-cols-2">
+              ${categoriesMap[category].map((article) => renderArticleCard(article)).join('')}
+            </div>
+          </section>
+        `).join('')}
+      </div>
+    </div>
   `;
+
+  // Add category tab navigation
+  const categoryTabs = screenRoot.querySelectorAll('[data-category-tab]');
+  const categoryBlocks = screenRoot.querySelectorAll('[data-category-block]');
+  
+  categoryTabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => {
+      // Update active tab
+      categoryTabs.forEach(t => t.classList.remove('active', 'text-white'));
+      categoryTabs.forEach(t => t.classList.add('text-white/80'));
+      tab.classList.add('active');
+      tab.classList.remove('text-white/80');
+      
+      // Scroll to category
+      if (categoryBlocks[index]) {
+        const mainContent = screenRoot.querySelector('.main-content');
+        const topBar = screenRoot.querySelector('.top-app-bar');
+        const offset = topBar ? topBar.offsetHeight + 16 : 16;
+        
+        mainContent.scrollTo({
+          top: categoryBlocks[index].offsetTop - offset,
+          behavior: 'smooth'
+        });
+      }
+    });
+  });
+
+  // Search functionality
+  const searchInput = screenRoot.querySelector('#search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      const allCards = screenRoot.querySelectorAll('[data-article-card]');
+      
+      allCards.forEach(card => {
+        const name = card.querySelector('h3').textContent.toLowerCase();
+        if (name.includes(query)) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  }
 
   animateMenuEntrance(screenRoot);
 }
@@ -224,29 +282,30 @@ export function renderMenu(screenRoot, articles) {
 export function bindAddToasts(screenRoot, toastRoot) {
   screenRoot.querySelectorAll('[data-add-button]').forEach((button) => {
     button.addEventListener('click', () => {
-      showToast(toastRoot, `${button.dataset.articleName} ajouté à votre sélection.`, 'success');
+      showToast(toastRoot, `${button.dataset.articleName} ajouté !`, 'success');
     });
   });
 }
 
 export function showToast(toastRoot, message, variant = 'info') {
   const styles = {
-    success: 'border-pine/20 bg-pine text-white',
-    info: 'border-wine/20 bg-ink text-white',
-    error: 'border-wine/20 bg-wine text-white'
+    success: 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30',
+    info: 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30',
+    error: 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30'
+  };
+
+  const icons = {
+    success: 'fa-circle-check',
+    info: 'fa-bell',
+    error: 'fa-circle-xmark'
   };
 
   const toast = document.createElement('div');
-  toast.className = `toast animate__animated animate__fadeInRight rounded-2xl border px-4 py-4 shadow-soft ${styles[variant] || styles.info}`;
+  toast.className = `toast animate__animated animate__fadeInRight rounded-2xl px-4 py-3 ${styles[variant] || styles.info}`;
   toast.innerHTML = `
-    <div class="flex items-start gap-3">
-      <span class="mt-1 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-sm">
-        <i class="fa-solid ${variant === 'success' ? 'fa-check' : variant === 'error' ? 'fa-xmark' : 'fa-bell'}"></i>
-      </span>
-      <div>
-        <p class="text-sm font-semibold">QRCommande</p>
-        <p class="mt-1 text-sm text-white/85">${message}</p>
-      </div>
+    <div class="flex items-center gap-3">
+      <i class="fa-solid ${icons[variant] || icons.info} text-xl"></i>
+      <p class="text-sm font-semibold">${message}</p>
     </div>
   `;
 
@@ -257,5 +316,5 @@ export function showToast(toastRoot, message, variant = 'info') {
     toast.classList.remove('animate__fadeInRight');
     toast.classList.add('animate__fadeOutRight');
     toast.addEventListener('animationend', () => toast.remove(), { once: true });
-  }, 2800);
+  }, 2500);
 }

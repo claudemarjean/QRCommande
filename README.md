@@ -1,6 +1,26 @@
 # QRCommande
 
-Application web de commande événementielle accessible par QR Code, permettant aux invités de passer des commandes en temps réel et au personnel de les gérer via un dashboard connecté à Supabase.
+Application mobile de commande événementielle accessible par QR Code, permettant aux invités de passer des commandes instantanément depuis leur téléphone.
+
+## 🎨 Interface Mobile Moderne
+
+L'application dispose maintenant d'une interface **100% optimisée mobile** qui ressemble à une vraie app native :
+
+### ✨ Fonctionnalités
+- **Top App Bar** avec recherche en temps réel
+- **Navigation par catégories** avec tabs horizontales
+- **Cards compactes** et modernes pour chaque article
+- **Bottom Navigation** fixe (Menu, Panier, Commandes, Compte)
+- **Design moderne** avec gradients purple/violet
+- **Animations fluides** et transitions smoothes
+- **PWA-ready** - Installable comme app mobile
+- **Responsive** - S'adapte parfaitement au mobile ET desktop
+
+### 🎨 Palette de couleurs
+- Gradient principal : Purple (#667eea) → Violet (#764ba2)
+- Accent disponible : Green gradient
+- Statut épuisé : Gris neutre
+- Background : Gris clair (#f8f9fa)
 
 ## MVP public
 
