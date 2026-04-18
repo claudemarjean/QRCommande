@@ -1,0 +1,64 @@
+@import 'animate.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: 'Manrope', sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(196, 155, 81, 0.18), transparent 30%),
+    linear-gradient(180deg, #fbf6ee 0%, #f4ede1 45%, #efe5d5 100%);
+}
+
+.app-shell {
+  min-height: 100vh;
+  background-image: radial-gradient(circle at top, rgba(196, 155, 81, 0.14), transparent 32%);
+}
+
+.glass-panel {
+  background: rgba(255, 252, 247, 0.72);
+  backdrop-filter: blur(18px);
+}
+
+.category-anchor {
+  scroll-margin-top: 6rem;
+}
+
+.article-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.article-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(196, 155, 81, 0.08), transparent 55%);
+  pointer-events: none;
+}
+
+.article-card--disabled::after {
+  background: rgba(29, 29, 27, 0.08);
+}
+
+.loader-ring {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(29, 29, 27, 0.08);
+  border-top-color: #c49b51;
+  border-right-color: #7a2939;
+}
+
+.toast-stack {
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+}
