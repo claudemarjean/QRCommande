@@ -1,27 +1,132 @@
-import { animateLoader, animateMenuEntrance, animateToast, stopLoader } from './animations.js';
+import { animateLoader, animateToast, stopLoader } from './animations.js';
+
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getCategoryIcon(category) {
+  const normalizedCategory = normalizeText(category);
+
+  if (/(vin|wine|champagne|cocktail|boisson|drink)/.test(normalizedCategory)) {
+    return 'fa-wine-glass';
+  }
+
+  if (/(burger|sandwich|snack|tapas|planche|finger)/.test(normalizedCategory)) {
+    return 'fa-burger';
+  }
+
+  if (/(dessert|gateau|glace|sucre|patisserie)/.test(normalizedCategory)) {
+    return 'fa-ice-cream';
+  }
+
+  if (/(cafe|the|tea|chaud)/.test(normalizedCategory)) {
+    return 'fa-mug-hot';
+  }
+
+  if (/(plat|repas|menu|cuisine|assiette)/.test(normalizedCategory)) {
+    return 'fa-utensils';
+  }
+
+  return 'fa-grid-2';
+}
+
+function updateVisibleCount(screenRoot, visibleCount) {
+  const counter = screenRoot.querySelector('[data-visible-count]');
+
+  if (!counter) {
+    return;
+  }
+
+  counter.textContent = `${visibleCount} article${visibleCount > 1 ? 's' : ''} affiché${visibleCount > 1 ? 's' : ''}`;
+}
+
+function setActiveCategoryTab(screenRoot, activeCategory) {
+  screenRoot.querySelectorAll('[data-category-tab]').forEach((tab) => {
+    const isActive = tab.dataset.categoryTab === activeCategory;
+    tab.classList.toggle('active', isActive);
+    tab.classList.toggle('text-white/80', !isActive);
+  });
+}
+
+function resetMenuVisibility(screenRoot, totalItems) {
+  screenRoot.querySelectorAll('[data-category-block]').forEach((section) => {
+    section.hidden = false;
+  });
+
+  screenRoot.querySelectorAll('[data-article-card]').forEach((card) => {
+    card.hidden = false;
+  });
+
+  const emptyState = screenRoot.querySelector('[data-empty-state]');
+  if (emptyState) {
+    emptyState.hidden = true;
+  }
+
+  setActiveCategoryTab(screenRoot, 'all');
+  updateVisibleCount(screenRoot, totalItems);
+}
+
+function applyMenuFilters(screenRoot, query, activeCategory) {
+  const normalizedQuery = normalizeText(query);
+  const showAll = normalizedQuery === '' && activeCategory === 'all';
+  let visibleCount = 0;
+
+  screenRoot.querySelectorAll('[data-category-block]').forEach((section) => {
+    const sectionCategory = section.dataset.categorySlug;
+    let sectionVisibleCount = 0;
+
+    section.querySelectorAll('[data-article-card]').forEach((card) => {
+      const cardText = `${card.dataset.articleName || ''} ${card.dataset.articleCategory || ''}`;
+      const matchesQuery = normalizedQuery === '' || cardText.includes(normalizedQuery);
+      const matchesCategory = activeCategory === 'all' || sectionCategory === activeCategory;
+      const isVisible = showAll || (matchesQuery && matchesCategory);
+
+      card.hidden = !isVisible;
+
+      if (isVisible) {
+        sectionVisibleCount += 1;
+        visibleCount += 1;
+      }
+    });
+
+    section.hidden = !showAll && sectionVisibleCount === 0;
+  });
+
+  setActiveCategoryTab(screenRoot, activeCategory);
+  updateVisibleCount(screenRoot, visibleCount);
+
+  const emptyState = screenRoot.querySelector('[data-empty-state]');
+  if (emptyState) {
+    emptyState.hidden = visibleCount !== 0;
+  }
+}
 
 function createAppContainer() {
   const container = document.createElement('div');
   container.className = 'app-shell';
   container.innerHTML = `
     <div id="toast-root" class="toast-stack fixed right-4 top-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2"></div>
-    <main id="screen-root" class="relative w-full h-full"></main>
+    <main id="screen-root" class="relative flex h-full min-h-0 w-full flex-col overflow-hidden"></main>
     <nav class="bottom-nav">
       <div class="flex items-center justify-around py-2">
         <button class="bottom-nav-item active flex flex-col items-center gap-1 px-4 py-2">
-          <i class="fa-solid fa-utensils text-xl"></i>
+          <i class="fa-solid fa-house text-xl"></i>
           <span class="text-xs font-semibold">Menu</span>
         </button>
         <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
-          <i class="fa-solid fa-shopping-bag text-xl"></i>
+          <i class="fa-solid fa-basket-shopping text-xl"></i>
           <span class="text-xs font-semibold">Panier</span>
         </button>
         <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
-          <i class="fa-solid fa-clock-rotate-left text-xl"></i>
+          <i class="fa-solid fa-receipt text-xl"></i>
           <span class="text-xs font-semibold">Commandes</span>
         </button>
         <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
-          <i class="fa-solid fa-user text-xl"></i>
+          <i class="fa-solid fa-user-large text-xl"></i>
           <span class="text-xs font-semibold">Compte</span>
         </button>
       </div>
@@ -32,14 +137,22 @@ function createAppContainer() {
 }
 
 function createTopBarMarkup(categories, totalItems) {
-  const tabs = categories.map((category, index) => `
+  const filterCategories = ['all', ...categories];
+  const tabs = filterCategories.map((category, index) => {
+    const isAll = category === 'all';
+    const label = isAll ? 'Toutes' : category;
+    const icon = isAll ? 'fa-table-cells-large' : getCategoryIcon(category);
+
+    return `
     <button
-      data-category-tab="${slugify(category)}"
+      data-category-tab="${isAll ? 'all' : slugify(category)}"
       class="category-tab px-4 py-2 text-sm font-semibold transition ${index === 0 ? 'active' : 'text-white/80'}"
     >
-      ${category}
+      <i class="fa-solid ${icon} text-[0.8rem]"></i>
+      <span>${label}</span>
     </button>
-  `).join('');
+  `;
+  }).join('');
 
   return `
     <div class="top-app-bar">
@@ -51,7 +164,7 @@ function createTopBarMarkup(categories, totalItems) {
             </div>
             <div>
               <h1 class="text-white font-bold text-lg">QRCommande</h1>
-              <p class="text-white/80 text-xs">${totalItems} articles disponibles</p>
+              <p class="text-white/80 text-xs" data-visible-count>${totalItems} articles affichés</p>
             </div>
           </div>
           <button class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white">
@@ -65,6 +178,11 @@ function createTopBarMarkup(categories, totalItems) {
             placeholder="Rechercher un article..."
             class="flex-1 bg-transparent text-white placeholder-white/60 outline-none text-sm"
             id="search-input"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="search"
           />
         </div>
       </div>
@@ -86,10 +204,16 @@ function slugify(value) {
 
 function renderArticleCard(article) {
   const isAvailable = Boolean(article.is_active);
+  const category = article.category || 'Autres';
+  const categoryIcon = getCategoryIcon(category);
+  const normalizedName = normalizeText(article.name);
+  const normalizedCategory = normalizeText(category);
 
   return `
     <article
       data-article-card
+      data-article-name="${normalizedName}"
+      data-article-category="${normalizedCategory}"
       class="article-card ${isAvailable ? 'available' : 'unavailable'}"
     >
       <div class="p-4">
@@ -97,8 +221,8 @@ function renderArticleCard(article) {
           <div class="flex-1 min-w-0">
             <h3 class="font-bold text-gray-900 text-base mb-1.5 leading-tight truncate">${article.name}</h3>
             <span class="category-label">
-              <i class="fa-solid fa-tag text-xs"></i>
-              ${article.category}
+              <i class="fa-solid ${categoryIcon} text-xs"></i>
+              ${category}
             </span>
           </div>
           <span class="status-badge ${isAvailable ? 'available' : 'unavailable'} flex-shrink-0">
@@ -217,10 +341,16 @@ export function renderMenu(screenRoot, articles) {
           <section
             id="category-${slugify(category)}"
             data-category-block
+            data-category-slug="${slugify(category)}"
             class="space-y-3"
           >
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-bold text-gray-800">${category}</h2>
+              <h2 class="flex items-center gap-2 text-lg font-bold text-gray-800">
+                <span class="section-icon">
+                  <i class="fa-solid ${getCategoryIcon(category)}"></i>
+                </span>
+                <span>${category}</span>
+              </h2>
               <span class="text-xs text-gray-500 font-medium">${categoriesMap[category].length} article${categoriesMap[category].length > 1 ? 's' : ''}</span>
             </div>
             <div class="grid gap-3 grid-cols-1 sm:grid-cols-2">
@@ -228,55 +358,44 @@ export function renderMenu(screenRoot, articles) {
             </div>
           </section>
         `).join('')}
+        <section data-empty-state hidden class="rounded-3xl bg-white px-5 py-8 text-center shadow-sm">
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-500">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </div>
+          <h3 class="mt-4 text-base font-bold text-gray-800">Aucun article trouvé</h3>
+          <p class="mt-2 text-sm text-gray-500">Essayez une autre recherche ou revenez sur le filtre Toutes.</p>
+        </section>
       </div>
     </div>
   `;
 
-  // Add category tab navigation
   const categoryTabs = screenRoot.querySelectorAll('[data-category-tab]');
-  const categoryBlocks = screenRoot.querySelectorAll('[data-category-block]');
+  const searchInput = screenRoot.querySelector('#search-input');
+  let activeCategory = 'all';
+
+  if (searchInput) {
+    searchInput.value = '';
+  }
   
-  categoryTabs.forEach((tab, index) => {
+  categoryTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      // Update active tab
-      categoryTabs.forEach(t => t.classList.remove('active', 'text-white'));
-      categoryTabs.forEach(t => t.classList.add('text-white/80'));
-      tab.classList.add('active');
-      tab.classList.remove('text-white/80');
-      
-      // Scroll to category
-      if (categoryBlocks[index]) {
-        const mainContent = screenRoot.querySelector('.main-content');
-        const topBar = screenRoot.querySelector('.top-app-bar');
-        const offset = topBar ? topBar.offsetHeight + 16 : 16;
-        
-        mainContent.scrollTo({
-          top: categoryBlocks[index].offsetTop - offset,
-          behavior: 'smooth'
-        });
+      activeCategory = tab.dataset.categoryTab;
+      applyMenuFilters(screenRoot, searchInput ? searchInput.value : '', activeCategory);
+
+      const mainContent = screenRoot.querySelector('.main-content');
+      if (mainContent) {
+        mainContent.scrollTo({ top: 0, behavior: 'smooth' });
       }
     });
   });
 
-  // Search functionality
-  const searchInput = screenRoot.querySelector('#search-input');
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase();
-      const allCards = screenRoot.querySelectorAll('[data-article-card]');
-      
-      allCards.forEach(card => {
-        const name = card.querySelector('h3').textContent.toLowerCase();
-        if (name.includes(query)) {
-          card.style.display = '';
-        } else {
-          card.style.display = 'none';
-        }
-      });
+      applyMenuFilters(screenRoot, e.target.value, activeCategory);
     });
   }
 
-  animateMenuEntrance(screenRoot);
+  resetMenuVisibility(screenRoot, totalItems);
 }
 
 export function bindAddToasts(screenRoot, toastRoot) {

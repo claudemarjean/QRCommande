@@ -26,13 +26,18 @@ export function animateMenuEntrance(rootElement) {
   const categories = rootElement.querySelectorAll('[data-category-block]');
   const cards = rootElement.querySelectorAll('[data-article-card]');
 
-  const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } });
+  const timeline = gsap.timeline({
+    defaults: { ease: 'power3.out' },
+    onComplete: () => {
+      gsap.set([hero, categories, cards], { clearProps: 'all' });
+    }
+  });
 
   if (hero) {
     timeline.from(hero.children, {
       y: 22,
       opacity: 0,
-      duration: 0.7,
+      duration: 0.55,
       stagger: 0.08
     });
   }
@@ -41,10 +46,10 @@ export function animateMenuEntrance(rootElement) {
     timeline.from(
       categories,
       {
-        y: 24,
+        y: 16,
         opacity: 0,
-        duration: 0.55,
-        stagger: 0.12
+        duration: 0.4,
+        stagger: 0.08
       },
       hero ? '-=0.25' : 0
     );
@@ -54,13 +59,12 @@ export function animateMenuEntrance(rootElement) {
     timeline.from(
       cards,
       {
-        y: 18,
+        y: 8,
         opacity: 0,
-        scale: 0.98,
-        duration: 0.4,
-        stagger: 0.05
+        duration: 0.25,
+        stagger: 0.02
       },
-      '-=0.35'
+      '-=0.2'
     );
   }
 }

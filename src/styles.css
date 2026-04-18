@@ -33,6 +33,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 40;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   box-shadow: 0 2px 12px rgba(102, 126, 234, 0.15);
 }
@@ -73,6 +74,9 @@ body {
 }
 
 .category-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   white-space: nowrap;
   transition: all 0.3s ease;
   border-radius: 20px;
@@ -83,6 +87,10 @@ body {
   background: white;
   color: #667eea;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.category-tab i {
+  opacity: 0.9;
 }
 
 /* Article Cards - Modern & Compact */
@@ -110,6 +118,10 @@ body {
 .article-card.unavailable {
   opacity: 0.5;
   background: #f8f9fa;
+}
+
+.article-card[hidden] {
+  display: none !important;
 }
 
 /* Badge moderne */
@@ -194,6 +206,7 @@ body {
 /* Scrollable Content */
 .main-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 80px;
@@ -210,6 +223,23 @@ body {
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.14), rgba(118, 75, 162, 0.18));
+  color: #667eea;
+  flex-shrink: 0;
+}
+
+[data-category-block][hidden],
+[data-empty-state][hidden] {
+  display: none !important;
 }
 
 /* Price Tag */
