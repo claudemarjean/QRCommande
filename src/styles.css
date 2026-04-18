@@ -38,6 +38,27 @@ body {
   box-shadow: 0 2px 12px rgba(102, 126, 234, 0.15);
 }
 
+.app-logo-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  flex-shrink: 0;
+  padding: 0.28rem;
+}
+
+.app-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
 /* Bottom Navigation */
 .bottom-nav {
   position: fixed;

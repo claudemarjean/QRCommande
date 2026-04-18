@@ -164,8 +164,8 @@ function createTopBarMarkup(categories, totalItems) {
       <div class="px-4 py-3">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-              <i class="fa-solid fa-qrcode text-white text-lg"></i>
+            <div class="app-logo-frame">
+              <img src="/assets/logo-app.png" alt="Logo QRCommande" class="app-logo-image" />
             </div>
             <div>
               <h1 class="text-white font-bold text-lg">QRCommande</h1>
