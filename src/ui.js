@@ -1,5 +1,9 @@
 import { animateLoader, animateToast, stopLoader } from './animations.js';
 
+function getCartCount(cartItems) {
+  return cartItems.reduce((total, item) => total + Number(item.quantity || 0), 0);
+}
+
 function normalizeText(value) {
   return String(value || '')
     .normalize('NFD')
@@ -113,19 +117,20 @@ function createAppContainer() {
     <main id="screen-root" class="relative flex h-full min-h-0 w-full flex-col overflow-hidden"></main>
     <nav class="bottom-nav">
       <div class="flex items-center justify-around py-2">
-        <button class="bottom-nav-item active flex flex-col items-center gap-1 px-4 py-2">
+        <button data-nav-target="menu" class="bottom-nav-item active flex flex-col items-center gap-1 px-4 py-2">
           <i class="fa-solid fa-house text-xl"></i>
           <span class="text-xs font-semibold">Menu</span>
         </button>
-        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+        <button data-nav-target="cart" class="bottom-nav-item relative flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+          <span data-cart-badge hidden class="cart-badge">0</span>
           <i class="fa-solid fa-basket-shopping text-xl"></i>
           <span class="text-xs font-semibold">Panier</span>
         </button>
-        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400" disabled>
           <i class="fa-solid fa-receipt text-xl"></i>
           <span class="text-xs font-semibold">Commandes</span>
         </button>
-        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400">
+        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-gray-400" disabled>
           <i class="fa-solid fa-user-large text-xl"></i>
           <span class="text-xs font-semibold">Compte</span>
         </button>
@@ -193,6 +198,31 @@ function createTopBarMarkup(categories, totalItems) {
   `;
 }
 
+function createCartHeaderMarkup(cartItems) {
+  const cartCount = getCartCount(cartItems);
+
+  return `
+    <div class="top-app-bar">
+      <div class="px-4 py-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="cart-header-icon">
+              <i class="fa-solid fa-basket-shopping text-white text-lg"></i>
+            </div>
+            <div>
+              <h1 class="text-white font-bold text-lg">Votre panier</h1>
+              <p class="text-white/80 text-xs">${cartCount} article${cartCount > 1 ? 's' : ''} sélectionné${cartCount > 1 ? 's' : ''}</p>
+            </div>
+          </div>
+          <button type="button" data-cart-clear class="rounded-full bg-white/15 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/25 ${cartCount === 0 ? 'pointer-events-none opacity-50' : ''}">
+            Vider
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function slugify(value) {
   return value
     .normalize('NFD')
@@ -244,7 +274,9 @@ function renderArticleCard(article) {
             }"
             ${isAvailable ? '' : 'disabled'}
             data-add-button
+            data-article-id="${article.id}"
             data-article-name="${article.name}"
+            data-article-category="${category}"
           >
             <i class="fa-solid fa-plus"></i>
             <span>Ajouter</span>
@@ -272,9 +304,37 @@ export function mountBaseLayout(rootElement) {
   const app = createAppContainer();
   rootElement.replaceChildren(app);
   return {
+    appRoot: app,
     screenRoot: app.querySelector('#screen-root'),
     toastRoot: app.querySelector('#toast-root')
   };
+}
+
+export function bindBottomNavigation(appRoot, onNavigate) {
+  appRoot.querySelectorAll('[data-nav-target]').forEach((button) => {
+    button.addEventListener('click', () => {
+      onNavigate(button.dataset.navTarget);
+    });
+  });
+}
+
+export function updateBottomNavigation(appRoot, activeView) {
+  appRoot.querySelectorAll('[data-nav-target]').forEach((button) => {
+    const isActive = button.dataset.navTarget === activeView;
+    button.classList.toggle('active', isActive);
+    button.classList.toggle('text-gray-400', !isActive);
+  });
+}
+
+export function updateCartBadge(appRoot, cartItems) {
+  const badge = appRoot.querySelector('[data-cart-badge]');
+  if (!badge) {
+    return;
+  }
+
+  const count = getCartCount(cartItems);
+  badge.hidden = count === 0;
+  badge.textContent = String(count);
 }
 
 export function renderLoader(screenRoot) {
@@ -398,12 +458,115 @@ export function renderMenu(screenRoot, articles) {
   resetMenuVisibility(screenRoot, totalItems);
 }
 
-export function bindAddToasts(screenRoot, toastRoot) {
+function renderCartItem(item) {
+  return `
+    <article class="cart-item rounded-3xl bg-white p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span class="category-label">
+              <i class="fa-solid ${getCategoryIcon(item.category)} text-xs"></i>
+              ${item.category}
+            </span>
+            <span class="cart-quantity">x${item.quantity}</span>
+          </div>
+          <h3 class="mt-3 text-base font-bold text-gray-900">${item.name}</h3>
+        </div>
+        <button
+          type="button"
+          data-remove-button
+          data-article-id="${item.id}"
+          class="cart-remove-btn"
+          aria-label="Supprimer ${item.name} du panier"
+        >
+          <i class="fa-solid fa-trash-can text-sm"></i>
+          <span>Supprimer</span>
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+export function renderCart(screenRoot, cartItems) {
+  const cartCount = getCartCount(cartItems);
+
+  screenRoot.innerHTML = `
+    ${createCartHeaderMarkup(cartItems)}
+    <div class="main-content bg-gray-50">
+      <div class="px-4 pt-4 pb-6">
+        ${cartItems.length
+          ? `
+            <section class="space-y-4">
+              <div class="cart-summary">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-purple-600">Résumé</p>
+                  <h2 class="mt-2 text-lg font-bold text-gray-900">${cartCount} article${cartCount > 1 ? 's' : ''} dans le panier</h2>
+                </div>
+                <button type="button" data-back-to-menu class="cart-secondary-btn">
+                  Ajouter encore
+                </button>
+              </div>
+              <div class="space-y-3">
+                ${cartItems.map((item) => renderCartItem(item)).join('')}
+              </div>
+            </section>
+          `
+          : `
+            <section class="cart-empty-state">
+              <div class="cart-empty-icon">
+                <i class="fa-solid fa-basket-shopping"></i>
+              </div>
+              <h2 class="mt-5 text-xl font-bold text-gray-900">Votre panier est vide</h2>
+              <p class="mt-2 text-sm leading-6 text-gray-500">Ajoutez quelques articles depuis le menu pour les retrouver ici.</p>
+              <button type="button" data-back-to-menu class="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/30">
+                <i class="fa-solid fa-utensils"></i>
+                Voir le menu
+              </button>
+            </section>
+          `}
+      </div>
+    </div>
+  `;
+}
+
+export function bindMenuActions(screenRoot, onAddToCart) {
   screenRoot.querySelectorAll('[data-add-button]').forEach((button) => {
     button.addEventListener('click', () => {
-      showToast(toastRoot, `${button.dataset.articleName} ajouté !`, 'success');
+      onAddToCart({
+        id: button.dataset.articleId,
+        name: button.dataset.articleName,
+        category: button.dataset.articleCategory
+      });
     });
   });
+}
+
+export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart }) {
+  if (screenRoot.__cartClickHandler) {
+    screenRoot.removeEventListener('click', screenRoot.__cartClickHandler);
+  }
+
+  const cartClickHandler = (event) => {
+    const removeButton = event.target.closest('[data-remove-button]');
+    if (removeButton) {
+      onRemoveItem(removeButton.dataset.articleId);
+      return;
+    }
+
+    const backButton = event.target.closest('[data-back-to-menu]');
+    if (backButton) {
+      onBackToMenu();
+      return;
+    }
+
+    const clearButton = event.target.closest('[data-cart-clear]');
+    if (clearButton) {
+      onClearCart();
+    }
+  };
+
+  screenRoot.__cartClickHandler = cartClickHandler;
+  screenRoot.addEventListener('click', cartClickHandler);
 }
 
 export function showToast(toastRoot, message, variant = 'info') {
