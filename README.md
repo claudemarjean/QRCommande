@@ -47,10 +47,14 @@ Note produit : avec le schéma fourni (`id`, `name`, `category`, `is_active`), l
 ## Architecture
 
 - [src/app.js](src/app.js) orchestre le cycle de vie de l'application et la navigation principale
+- [src/auth.js](src/auth.js) centralise login, logout, restauration de session et écoute des changements Auth
+- [src/userState.js](src/userState.js) centralise l’état utilisateur admin/staff côté frontend
 - [src/config.js](src/config.js) centralise la configuration d'environnement et les garde-fous applicatifs
 - [src/cart.js](src/cart.js) isole la logique panier et la persistance locale
 - [src/supabaseClient.js](src/supabaseClient.js) encapsule l'accès aux données et normalise les articles
 - [src/ui.js](src/ui.js) concentre le rendu et les interactions DOM
+- [src/adminUi.js](src/adminUi.js) rend les pages protégées Dashboard, Commandes, Articles, Catégories et Paramètres
+- [src/components/menuPublic.js](src/components/menuPublic.js) et [src/components/menuAdmin.js](src/components/menuAdmin.js) génèrent les navigations dynamiques
 - [src/animations.js](src/animations.js) isole les animations GSAP
 
 Principes appliqués:

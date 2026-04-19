@@ -702,6 +702,38 @@ export async function reconcileStoredOrders(storedOrders) {
     .slice(0, 10);
 }
 
+export async function fetchAdminOrders() {
+  if (!supabase) {
+    if (appConfig.useDemoData) {
+      return [];
+    }
+
+    throw new Error('Erreur de configuration E_CFG_004. Contactez l\'administrateur.');
+  }
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, order_number, table_label, created_at, status')
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) {
+    if (isRowLevelSecurityError(error)) {
+      throw new Error('Lecture admin bloquée par Supabase (RLS). Ajoutez une policy SELECT sur public.orders pour les profils admin/staff.');
+    }
+
+    throw new Error(error.message || 'Impossible de charger les commandes admin.');
+  }
+
+  const safeOrders = Array.isArray(data) ? data : [];
+  const orderStatusIds = [...new Set(safeOrders.map((order) => getOrderStatusId(order)).filter(Boolean))];
+  const statusById = await buildStatusLookup(orderStatusIds);
+
+  return safeOrders.map((order) => normalizeOrderRecord(order, order?.created_at, {
+    statusById
+  }));
+}
+
 async function insertOrderItems(orderId, cartItems) {
   const rows = cartItems.map((item) => ({
     order_id: orderId,

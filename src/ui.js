@@ -1,4 +1,6 @@
 import { animateAdminAccess, animateLoader, animateMenuEntrance, animateOrderConfirmation, animateToast, stopLoader } from './animations.js';
+import { MenuAdmin } from './components/menuAdmin.js';
+import { MenuPublic } from './components/menuPublic.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -215,35 +217,7 @@ function createAppContainer() {
   container.innerHTML = `
     <div id="toast-root" class="toast-stack fixed right-4 top-4 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-2"></div>
     <main id="screen-root" class="relative flex h-full min-h-0 w-full flex-col overflow-hidden"></main>
-    <nav class="bottom-nav">
-      <div class="bottom-nav-shell flex items-center justify-around py-2">
-        <button data-nav-target="menu" class="bottom-nav-item active flex flex-col items-center gap-1 px-4 py-2">
-          <span class="bottom-nav-icon-shell">
-            ${renderBottomNavIcon('menu')}
-          </span>
-          <span class="bottom-nav-label text-xs font-semibold">Menu</span>
-        </button>
-        <button data-nav-target="cart" class="bottom-nav-item relative flex flex-col items-center gap-1 px-4 py-2 text-slate-500">
-          <span data-cart-badge hidden class="cart-badge">0</span>
-          <span class="bottom-nav-icon-shell">
-            ${renderBottomNavIcon('cart')}
-          </span>
-          <span class="bottom-nav-label text-xs font-semibold">Panier</span>
-        </button>
-        <button data-nav-target="orders" class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-slate-500">
-          <span class="bottom-nav-icon-shell">
-            ${renderBottomNavIcon('orders')}
-          </span>
-          <span class="bottom-nav-label text-xs font-semibold">Commandes</span>
-        </button>
-        <button data-nav-target="account" class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-slate-500">
-          <span class="bottom-nav-icon-shell">
-            ${renderBottomNavIcon('account')}
-          </span>
-          <span class="bottom-nav-label text-xs font-semibold">Compte</span>
-        </button>
-      </div>
-    </nav>
+    <div id="nav-root" class="app-nav-root"></div>
   `;
 
   return container;
@@ -483,25 +457,55 @@ export function mountBaseLayout(rootElement) {
   rootElement.replaceChildren(app);
   return {
     appRoot: app,
+    navRoot: app.querySelector('#nav-root'),
     screenRoot: app.querySelector('#screen-root'),
     toastRoot: app.querySelector('#toast-root')
   };
 }
 
-export function bindBottomNavigation(appRoot, onNavigate) {
-  appRoot.querySelectorAll('[data-nav-target]').forEach((button) => {
-    button.addEventListener('click', () => {
-      onNavigate(button.dataset.navTarget);
-    });
-  });
+export function renderNavigation(navRoot, options = {}) {
+  if (!navRoot) {
+    return;
+  }
+
+  const mode = options.mode === 'admin' ? 'admin' : 'public';
+
+  navRoot.innerHTML = mode === 'admin'
+    ? MenuAdmin({
+        activeView: options.activeView
+      })
+    : MenuPublic({
+        activeView: options.activeView,
+        counts: {
+          cartCount: options.cartCount
+        }
+      });
 }
 
-export function updateBottomNavigation(appRoot, activeView) {
-  appRoot.querySelectorAll('[data-nav-target]').forEach((button) => {
-    const isActive = button.dataset.navTarget === activeView;
-    button.classList.toggle('active', isActive);
-    button.classList.toggle('text-slate-500', !isActive);
-  });
+export function bindNavigationActions(navRoot, { onNavigate, onAction }) {
+  if (!navRoot) {
+    return;
+  }
+
+  if (navRoot.__navigationClickHandler) {
+    navRoot.removeEventListener('click', navRoot.__navigationClickHandler);
+  }
+
+  const navigationClickHandler = (event) => {
+    const targetButton = event.target.closest('[data-nav-target]');
+    if (targetButton && typeof onNavigate === 'function') {
+      onNavigate(targetButton.dataset.navTarget);
+      return;
+    }
+
+    const actionButton = event.target.closest('[data-nav-action]');
+    if (actionButton && typeof onAction === 'function') {
+      onAction(actionButton.dataset.navAction);
+    }
+  };
+
+  navRoot.__navigationClickHandler = navigationClickHandler;
+  navRoot.addEventListener('click', navigationClickHandler);
 }
 
 export function updateCartBadge(appRoot, cartItems) {

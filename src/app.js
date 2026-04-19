@@ -1,31 +1,44 @@
 import './styles.css';
 
-import { appConfig } from './config.js';
+import { bindAdminPageActions, renderAdminPage, updateAdminOrdersView } from './adminUi.js';
+import { login, logout, getSession, subscribeToAuthChanges } from './auth.js';
 import { addToCart, loadCart, persistCart, removeFromCart, updateCartItemQuantity } from './cart.js';
-import { createOrder, fetchArticles, reconcileStoredOrders, restoreAdminSession, signInAdmin, signOutAdmin } from './supabaseClient.js';
+import { appConfig } from './config.js';
+import {
+  createOrder,
+  fetchAdminOrders,
+  fetchArticles,
+  reconcileStoredOrders
+} from './supabaseClient.js';
+import {
+  clearAuthenticatedUser,
+  getUserState,
+  isAuthenticatedUser,
+  setAuthenticatedUser,
+  setUserCheckingState
+} from './userState.js';
 import {
   bindAdminLoginActions,
-  bindAdminTestActions,
-  bindBottomNavigation,
   bindCartActions,
   bindMenuActions,
+  bindNavigationActions,
   bindOrdersActions,
   mountBaseLayout,
   renderAdminLogin,
-  renderAdminTestScreen,
   renderCart,
   renderErrorState,
   renderInactiveState,
   renderLoader,
   renderMenu,
+  renderNavigation,
   renderOrderConfirmation,
   renderOrders,
-  showToast,
-  updateOrdersList,
-  updateCartScreen,
-  updateBottomNavigation,
-  updateCartBadge
+  showToast
 } from './ui.js';
+
+const ADMIN_VIEWS = new Set(['dashboard', 'admin-orders', 'admin-articles', 'admin-categories', 'admin-settings']);
+const ADMIN_LIVE_VIEWS = new Set(['dashboard', 'admin-orders']);
+const PUBLIC_VIEWS = new Set(['menu', 'cart', 'orders', 'account', 'confirmation']);
 
 function createOrdersSnapshot(orders) {
   return JSON.stringify(
@@ -37,19 +50,21 @@ function createOrdersSnapshot(orders) {
       statusId: String(order?.statusId || ''),
       statusCode: String(order?.statusCode || ''),
       statusLabel: String(order?.statusLabel || ''),
-      createdAt: String(order?.createdAt || ''),
-      items: Array.isArray(order?.items)
-        ? order.items.map((item) => ({
-            name: String(item?.name || ''),
-            quantity: Math.max(1, Number(item?.quantity) || 1)
-          }))
-        : []
+      createdAt: String(order?.createdAt || '')
     }))
   );
 }
 
-function getNavigationView(currentView) {
-  return currentView === 'admin-test' ? 'account' : currentView;
+function getCartCount(cartItems) {
+  return (Array.isArray(cartItems) ? cartItems : []).reduce((total, item) => total + Number(item?.quantity || 0), 0);
+}
+
+function isAdminView(view) {
+  return ADMIN_VIEWS.has(view);
+}
+
+function getPublicNavigationView(view) {
+  return PUBLIC_VIEWS.has(view) ? view : 'menu';
 }
 
 function sortArticles(articles) {
@@ -101,32 +116,35 @@ function loadOrders() {
 
 function persistOrders(orders) {
   try {
-    window.localStorage.setItem(appConfig.ordersStorageKey, JSON.stringify(orders.slice(0, 10)));
+    window.localStorage.setItem(appConfig.ordersStorageKey, JSON.stringify((Array.isArray(orders) ? orders : []).slice(0, 10)));
   } catch {
     // Ignore storage failures to keep the orders view usable.
   }
 }
 
 function createOrderItemsSnapshot(cartItems) {
-  return cartItems.map((item) => ({
-    name: String(item?.name || '').trim().slice(0, appConfig.maxTextLength),
-    quantity: Math.max(1, Number(item?.quantity) || 1)
-  })).filter((item) => item.name);
+  return (Array.isArray(cartItems) ? cartItems : [])
+    .map((item) => ({
+      name: String(item?.name || '').trim().slice(0, appConfig.maxTextLength),
+      quantity: Math.max(1, Number(item?.quantity) || 1)
+    }))
+    .filter((item) => item.name);
 }
 
 async function bootstrap() {
   const ordersPollingIntervalMs = 10000;
   const rootElement = document.querySelector('#app');
-  const { appRoot, screenRoot, toastRoot } = mountBaseLayout(rootElement);
+  const { navRoot, screenRoot, toastRoot } = mountBaseLayout(rootElement);
   const stopLoading = renderLoader(screenRoot);
+
   const state = {
     currentView: 'menu',
     articles: [],
     cart: loadCart(),
     orders: loadOrders(),
     ordersSyncPromise: null,
-    ordersSyncInProgress: false,
     ordersPollingTimer: null,
+    authUnsubscribe: null,
     account: {
       email: '',
       password: '',
@@ -134,6 +152,14 @@ async function bootstrap() {
       isSubmitting: false,
       showPassword: false,
       adminProfile: null
+    },
+    admin: {
+      orders: [],
+      ordersError: '',
+      isLoading: false,
+      lastSyncedAt: '',
+      snapshot: '[]',
+      pollingTimer: null
     },
     checkout: {
       isSubmitting: false,
@@ -143,6 +169,18 @@ async function bootstrap() {
     }
   };
 
+  function updateNavigation() {
+    const authState = getUserState();
+    const isAuthenticated = isAuthenticatedUser(authState);
+
+    renderNavigation(navRoot, {
+      mode: isAuthenticated ? 'admin' : 'public',
+      activeView: isAuthenticated ? (isAdminView(state.currentView) ? state.currentView : 'dashboard') : getPublicNavigationView(state.currentView),
+      user: authState.user,
+      cartCount: getCartCount(state.cart)
+    });
+  }
+
   async function syncOrdersFromStorageWithDatabase() {
     if (state.ordersSyncPromise) {
       return state.ordersSyncPromise;
@@ -150,7 +188,6 @@ async function bootstrap() {
 
     state.orders = loadOrders();
     const previousOrdersSnapshot = createOrdersSnapshot(state.orders);
-    state.ordersSyncInProgress = true;
 
     state.ordersSyncPromise = (async () => {
       const syncedOrders = await reconcileStoredOrders(state.orders);
@@ -171,7 +208,6 @@ async function bootstrap() {
     try {
       return await state.ordersSyncPromise;
     } finally {
-      state.ordersSyncInProgress = false;
       state.ordersSyncPromise = null;
     }
   }
@@ -198,7 +234,7 @@ async function bootstrap() {
         const syncResult = await syncOrdersFromStorageWithDatabase();
 
         if (state.currentView === 'orders' && syncResult?.hasChanged) {
-          updateOrdersList(screenRoot, state.orders);
+          renderCurrentView();
         }
       } catch {
         // Keep background polling silent for the user.
@@ -206,13 +242,108 @@ async function bootstrap() {
     }, ordersPollingIntervalMs);
   }
 
-  function updateOrdersPolling() {
-    if (state.currentView === 'orders') {
-      startOrdersPolling();
+  function stopAdminPolling() {
+    if (state.admin.pollingTimer !== null) {
+      window.clearInterval(state.admin.pollingTimer);
+      state.admin.pollingTimer = null;
+    }
+  }
+
+  async function refreshAdminOrders(options = {}) {
+    const authState = getUserState();
+
+    if (!isAuthenticatedUser(authState)) {
+      state.admin.orders = [];
+      state.admin.ordersError = '';
+      state.admin.isLoading = false;
+      state.admin.lastSyncedAt = '';
+      state.admin.snapshot = '[]';
       return;
     }
 
-    stopOrdersPolling();
+    const shouldRenderLoading = !options.silent && isAdminView(state.currentView);
+    const shouldPatchOnly = Boolean(options.patchOnly) && ADMIN_LIVE_VIEWS.has(state.currentView);
+    state.admin.isLoading = true;
+
+    if (shouldRenderLoading) {
+      renderCurrentView();
+    } else if (shouldPatchOnly) {
+      updateAdminOrdersView(screenRoot, {
+        activeView: state.currentView,
+        orders: state.admin.orders,
+        adminState: state.admin
+      });
+    }
+
+    try {
+      const orders = await fetchAdminOrders();
+      const snapshot = createOrdersSnapshot(orders);
+      const hasChanged = state.admin.snapshot !== snapshot;
+
+      state.admin.orders = orders;
+      state.admin.snapshot = snapshot;
+      state.admin.ordersError = '';
+      state.admin.lastSyncedAt = new Date().toISOString();
+      state.admin.isLoading = false;
+
+      if (shouldPatchOnly && isAdminView(state.currentView)) {
+        updateAdminOrdersView(screenRoot, {
+          activeView: state.currentView,
+          orders: state.admin.orders,
+          adminState: state.admin
+        });
+        return;
+      }
+
+      if (isAdminView(state.currentView) && (hasChanged || shouldRenderLoading || options.forceRender)) {
+        renderCurrentView();
+      }
+    } catch (error) {
+      state.admin.ordersError = error.message || 'Lecture des commandes admin impossible. Vérifiez les policies SELECT sur public.orders.';
+      state.admin.isLoading = false;
+
+      if (shouldPatchOnly && isAdminView(state.currentView)) {
+        updateAdminOrdersView(screenRoot, {
+          activeView: state.currentView,
+          orders: state.admin.orders,
+          adminState: state.admin
+        });
+        return;
+      }
+
+      if (isAdminView(state.currentView)) {
+        renderCurrentView();
+      }
+    }
+  }
+
+  function startAdminPolling() {
+    if (state.admin.pollingTimer !== null) {
+      return;
+    }
+
+    state.admin.pollingTimer = window.setInterval(() => {
+      if (!isAdminView(state.currentView) || !ADMIN_LIVE_VIEWS.has(state.currentView) || !isAuthenticatedUser(getUserState())) {
+        stopAdminPolling();
+        return;
+      }
+
+      void refreshAdminOrders({ silent: true, patchOnly: true });
+    }, ordersPollingIntervalMs);
+  }
+
+  function updatePollingState() {
+    if (state.currentView === 'orders') {
+      startOrdersPolling();
+    } else {
+      stopOrdersPolling();
+    }
+
+    if (isAdminView(state.currentView) && ADMIN_LIVE_VIEWS.has(state.currentView) && isAuthenticatedUser(getUserState())) {
+      startAdminPolling();
+    } else {
+      stopAdminPolling();
+    }
   }
 
   async function openOrdersView() {
@@ -222,37 +353,100 @@ async function bootstrap() {
     try {
       const syncResult = await syncOrdersFromStorageWithDatabase();
       if (state.currentView === 'orders' && syncResult?.hasChanged) {
-        updateOrdersList(screenRoot, state.orders);
+        renderCurrentView();
       }
     } catch (error) {
-      showToast(toastRoot, error.message || 'La synchronisation des commandes a echoue.', 'error');
+      showToast(toastRoot, error.message || 'La synchronisation des commandes a échoué.', 'error');
     }
   }
 
-  async function openAccountView() {
-    state.currentView = 'account';
+  async function applyAuthenticatedContext(authContext, options = {}) {
+    setAuthenticatedUser(authContext);
+    state.account.adminProfile = authContext.user;
+    state.account.email = authContext.user?.email || state.account.email;
+    state.account.password = '';
     state.account.errorMessage = '';
+    state.account.isSubmitting = false;
 
-    try {
-      const adminContext = await restoreAdminSession();
-      state.account.adminProfile = adminContext.admin;
-      state.currentView = adminContext.admin ? 'admin-test' : 'account';
-    } catch (error) {
-      state.account.adminProfile = null;
-      state.account.errorMessage = error.message || 'Impossible de verifier la session administrateur.';
+    if (!isAdminView(state.currentView) || options.forceDashboard) {
+      state.currentView = 'dashboard';
+    }
+
+    renderCurrentView();
+    await refreshAdminOrders({ silent: true, forceRender: true });
+  }
+
+  function applyUnauthenticatedContext() {
+    clearAuthenticatedUser();
+    state.account.adminProfile = null;
+    state.account.password = '';
+    state.account.isSubmitting = false;
+    state.admin.orders = [];
+    state.admin.ordersError = '';
+    state.admin.isLoading = false;
+    state.admin.lastSyncedAt = '';
+    state.admin.snapshot = '[]';
+    stopAdminPolling();
+
+    if (isAdminView(state.currentView) || state.currentView === 'confirmation') {
+      state.currentView = 'menu';
     }
 
     renderCurrentView();
   }
 
-  function syncCartUi() {
-    updateCartBadge(appRoot, state.cart);
-    updateBottomNavigation(appRoot, getNavigationView(state.currentView));
+  function syncCurrentViewToAuthState() {
+    const authState = getUserState();
+
+    if (isAuthenticatedUser(authState) && !isAdminView(state.currentView)) {
+      state.currentView = 'dashboard';
+    }
+
+    if (!isAuthenticatedUser(authState) && isAdminView(state.currentView)) {
+      state.currentView = 'menu';
+    }
   }
 
   function renderCurrentView() {
-    syncCartUi();
-    updateOrdersPolling();
+    syncCurrentViewToAuthState();
+    updateNavigation();
+    updatePollingState();
+
+    const authState = getUserState();
+    const isAuthenticated = isAuthenticatedUser(authState);
+
+    if (isAuthenticated) {
+      renderAdminPage(screenRoot, {
+        activeView: state.currentView,
+        user: authState.user,
+        orders: state.admin.orders,
+        articles: state.articles,
+        adminState: state.admin
+      });
+
+      bindAdminPageActions(screenRoot, {
+        onNavigate: (nextView) => {
+          state.currentView = nextView;
+          renderCurrentView();
+
+          if (ADMIN_LIVE_VIEWS.has(nextView) && state.admin.orders.length === 0) {
+            void refreshAdminOrders({ silent: false, forceRender: true });
+          }
+        },
+        onRefresh: async () => {
+          await refreshAdminOrders({ silent: false, forceRender: true });
+          if (!state.admin.ordersError) {
+            showToast(toastRoot, 'Vue admin synchronisée.', 'info');
+          }
+        },
+        onSignOut: async () => {
+          await logout();
+          applyUnauthenticatedContext();
+          showToast(toastRoot, 'Session admin fermée.', 'info');
+        }
+      });
+      return;
+    }
 
     if (state.currentView === 'cart') {
       renderCart(screenRoot, state.cart, {
@@ -275,14 +469,7 @@ async function bootstrap() {
           state.cart = updateCartItemQuantity(state.cart, articleId, currentItem.quantity + delta);
           state.checkout.errorMessage = '';
           persistCart(state.cart);
-          updateCartBadge(appRoot, state.cart);
-
-          if (state.cart.length === 0) {
-            renderCurrentView();
-            return;
-          }
-
-          updateCartScreen(screenRoot, state.cart, { articleId });
+          renderCurrentView();
         },
         onRemoveItem: (articleId) => {
           if (state.checkout.isSubmitting) {
@@ -305,11 +492,7 @@ async function bootstrap() {
           renderCurrentView();
         },
         onClearCart: () => {
-          if (state.checkout.isSubmitting) {
-            return;
-          }
-
-          if (state.cart.length === 0) {
+          if (state.checkout.isSubmitting || state.cart.length === 0) {
             return;
           }
 
@@ -340,7 +523,7 @@ async function bootstrap() {
           }
 
           if (!String(state.checkout.tableLabel || '').trim()) {
-            state.checkout.errorMessage = 'Renseignez votre numero de table ou un repere dans l\'evenement pour que le service vous retrouve.';
+            state.checkout.errorMessage = 'Renseignez votre numéro de table ou un repère dans l\'événement pour que le service vous retrouve.';
             renderCurrentView();
             showToast(toastRoot, state.checkout.errorMessage, 'error');
             return;
@@ -358,6 +541,7 @@ async function bootstrap() {
               status: order.statusCode || order.status,
               items: orderItemsSnapshot
             };
+
             state.cart = [];
             state.orders = [orderWithItems, ...state.orders.filter((entry) => entry.id !== order.id)].slice(0, 10);
             state.checkout.isSubmitting = false;
@@ -463,14 +647,8 @@ async function bootstrap() {
           renderCurrentView();
 
           try {
-            const adminContext = await signInAdmin(email, password);
-            state.account.adminProfile = adminContext.admin;
-            state.account.email = adminContext.admin?.email || email;
-            state.account.password = '';
-            state.account.isSubmitting = false;
-            state.account.errorMessage = '';
-            state.currentView = 'admin-test';
-            renderCurrentView();
+            const authContext = await login(email, password);
+            await applyAuthenticatedContext(authContext, { forceDashboard: true });
             showToast(toastRoot, 'Connexion admin réussie.', 'success');
           } catch (error) {
             state.account.adminProfile = null;
@@ -484,52 +662,55 @@ async function bootstrap() {
       return;
     }
 
-    if (state.currentView === 'admin-test') {
-      renderAdminTestScreen(screenRoot, state.account.adminProfile);
-      bindAdminTestActions(screenRoot, {
-        onSignOut: async () => {
-          await signOutAdmin();
-          state.account.adminProfile = null;
-          state.account.password = '';
-          state.account.errorMessage = '';
-          state.currentView = 'account';
-          renderCurrentView();
-          showToast(toastRoot, 'Session admin fermée.', 'info');
-        }
-      });
-      return;
-    }
-
     renderMenu(screenRoot, state.articles);
     bindMenuActions(screenRoot, (article) => {
       state.cart = addToCart(state.cart, article);
       state.checkout.errorMessage = '';
       persistCart(state.cart);
-      syncCartUi();
+      updateNavigation();
       showToast(toastRoot, `${article.name} ajouté au panier.`, 'success');
     });
   }
 
-  bindBottomNavigation(appRoot, (targetView) => {
-    if (targetView === 'orders') {
-      void openOrdersView();
-      return;
-    }
+  bindNavigationActions(navRoot, {
+    onNavigate: (targetView) => {
+      if (targetView === 'orders') {
+        void openOrdersView();
+        return;
+      }
 
-    if (targetView === 'account') {
-      void openAccountView();
-      return;
-    }
+      if (targetView === 'account') {
+        state.currentView = 'account';
+        state.account.errorMessage = '';
+        renderCurrentView();
+        return;
+      }
 
-    state.currentView = targetView;
-    renderCurrentView();
+      state.currentView = targetView;
+      renderCurrentView();
+
+      if (isAdminView(targetView) && ADMIN_LIVE_VIEWS.has(targetView) && state.admin.orders.length === 0) {
+        void refreshAdminOrders({ silent: false, forceRender: true });
+      }
+    },
+    onAction: async (action) => {
+      if (action !== 'logout') {
+        return;
+      }
+
+      await logout();
+      applyUnauthenticatedContext();
+      showToast(toastRoot, 'Retour au mode public.', 'info');
+    }
   });
 
   try {
+    setUserCheckingState();
     await new Promise((resolve) => window.setTimeout(resolve, 550));
 
     if (!appConfig.isAppActive) {
       stopOrdersPolling();
+      stopAdminPolling();
       stopLoading();
       renderInactiveState(screenRoot);
       return;
@@ -538,14 +719,11 @@ async function bootstrap() {
     const articles = await fetchArticles();
     state.articles = sortArticles(articles);
 
-    try {
-      const adminContext = await restoreAdminSession();
-      state.account.adminProfile = adminContext.admin;
-      if (adminContext.admin?.email) {
-        state.account.email = adminContext.admin.email;
-      }
-    } catch {
-      state.account.adminProfile = null;
+    const authContext = await getSession();
+    if (authContext.user) {
+      await applyAuthenticatedContext(authContext, { forceDashboard: true });
+    } else {
+      applyUnauthenticatedContext();
     }
 
     if (state.orders.length) {
@@ -556,11 +734,34 @@ async function bootstrap() {
       }
     }
 
+    if (state.authUnsubscribe) {
+      state.authUnsubscribe();
+    }
+
+    state.authUnsubscribe = subscribeToAuthChanges((nextAuthContext) => {
+      void (async () => {
+        const previousState = getUserState();
+        const wasAuthenticated = isAuthenticatedUser(previousState);
+
+        if (nextAuthContext?.user) {
+          await applyAuthenticatedContext(nextAuthContext, { forceDashboard: !wasAuthenticated });
+          return;
+        }
+
+        applyUnauthenticatedContext();
+
+        if (wasAuthenticated) {
+          showToast(toastRoot, 'Déconnexion détectée. Retour au mode public.', 'info');
+        }
+      })();
+    });
+
     stopLoading();
     renderCurrentView();
     showToast(toastRoot, 'Le menu est prêt. Bonne dégustation.', 'info');
   } catch (error) {
     stopOrdersPolling();
+    stopAdminPolling();
     stopLoading();
     renderErrorState(screenRoot, error.message || 'Une erreur est survenue.');
     showToast(toastRoot, 'Le menu n’a pas pu être chargé.', 'error');
