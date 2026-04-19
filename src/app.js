@@ -17,10 +17,32 @@ import {
   renderOrderConfirmation,
   renderOrders,
   showToast,
+  updateOrdersList,
   updateCartScreen,
   updateBottomNavigation,
   updateCartBadge
 } from './ui.js';
+
+function createOrdersSnapshot(orders) {
+  return JSON.stringify(
+    (Array.isArray(orders) ? orders : []).map((order) => ({
+      id: String(order?.id || ''),
+      orderNumber: String(order?.orderNumber || ''),
+      tableLabel: String(order?.tableLabel || ''),
+      status: String(order?.status || ''),
+      statusId: String(order?.statusId || ''),
+      statusCode: String(order?.statusCode || ''),
+      statusLabel: String(order?.statusLabel || ''),
+      createdAt: String(order?.createdAt || ''),
+      items: Array.isArray(order?.items)
+        ? order.items.map((item) => ({
+            name: String(item?.name || ''),
+            quantity: Math.max(1, Number(item?.quantity) || 1)
+          }))
+        : []
+    }))
+  );
+}
 
 function sortArticles(articles) {
   return [...articles].sort((left, right) => {
@@ -85,6 +107,7 @@ function createOrderItemsSnapshot(cartItems) {
 }
 
 async function bootstrap() {
+  const ordersPollingIntervalMs = 10000;
   const rootElement = document.querySelector('#app');
   const { appRoot, screenRoot, toastRoot } = mountBaseLayout(rootElement);
   const stopLoading = renderLoader(screenRoot);
@@ -95,6 +118,7 @@ async function bootstrap() {
     orders: loadOrders(),
     ordersSyncPromise: null,
     ordersSyncInProgress: false,
+    ordersPollingTimer: null,
     checkout: {
       isSubmitting: false,
       errorMessage: '',
@@ -109,23 +133,70 @@ async function bootstrap() {
     }
 
     state.orders = loadOrders();
+    const previousOrdersSnapshot = createOrdersSnapshot(state.orders);
     state.ordersSyncInProgress = true;
-    if (state.currentView === 'orders') {
-      renderCurrentView();
-    }
 
     state.ordersSyncPromise = (async () => {
       const syncedOrders = await reconcileStoredOrders(state.orders);
-      state.orders = syncedOrders;
-      persistOrders(state.orders);
+      const nextOrdersSnapshot = createOrdersSnapshot(syncedOrders);
+      const hasChanged = previousOrdersSnapshot !== nextOrdersSnapshot;
+
+      if (hasChanged) {
+        state.orders = syncedOrders;
+        persistOrders(state.orders);
+      }
+
+      return {
+        hasChanged,
+        orders: hasChanged ? syncedOrders : state.orders
+      };
     })();
 
     try {
-      await state.ordersSyncPromise;
+      return await state.ordersSyncPromise;
     } finally {
       state.ordersSyncInProgress = false;
       state.ordersSyncPromise = null;
     }
+  }
+
+  function stopOrdersPolling() {
+    if (state.ordersPollingTimer !== null) {
+      window.clearInterval(state.ordersPollingTimer);
+      state.ordersPollingTimer = null;
+    }
+  }
+
+  function startOrdersPolling() {
+    if (state.ordersPollingTimer !== null) {
+      return;
+    }
+
+    state.ordersPollingTimer = window.setInterval(async () => {
+      if (state.currentView !== 'orders') {
+        stopOrdersPolling();
+        return;
+      }
+
+      try {
+        const syncResult = await syncOrdersFromStorageWithDatabase();
+
+        if (state.currentView === 'orders' && syncResult?.hasChanged) {
+          updateOrdersList(screenRoot, state.orders);
+        }
+      } catch {
+        // Keep background polling silent for the user.
+      }
+    }, ordersPollingIntervalMs);
+  }
+
+  function updateOrdersPolling() {
+    if (state.currentView === 'orders') {
+      startOrdersPolling();
+      return;
+    }
+
+    stopOrdersPolling();
   }
 
   async function openOrdersView() {
@@ -133,9 +204,9 @@ async function bootstrap() {
     renderCurrentView();
 
     try {
-      await syncOrdersFromStorageWithDatabase();
-      if (state.currentView === 'orders') {
-        renderCurrentView();
+      const syncResult = await syncOrdersFromStorageWithDatabase();
+      if (state.currentView === 'orders' && syncResult?.hasChanged) {
+        updateOrdersList(screenRoot, state.orders);
       }
     } catch (error) {
       showToast(toastRoot, error.message || 'La synchronisation des commandes a echoue.', 'error');
@@ -149,6 +220,7 @@ async function bootstrap() {
 
   function renderCurrentView() {
     syncCartUi();
+    updateOrdersPolling();
 
     if (state.currentView === 'cart') {
       renderCart(screenRoot, state.cart, {
@@ -347,6 +419,7 @@ async function bootstrap() {
     await new Promise((resolve) => window.setTimeout(resolve, 550));
 
     if (!appConfig.isAppActive) {
+      stopOrdersPolling();
       stopLoading();
       renderInactiveState(screenRoot);
       return;
@@ -367,6 +440,7 @@ async function bootstrap() {
     renderCurrentView();
     showToast(toastRoot, 'Le menu est prêt. Bonne dégustation.', 'info');
   } catch (error) {
+    stopOrdersPolling();
     stopLoading();
     renderErrorState(screenRoot, error.message || 'Une erreur est survenue.');
     showToast(toastRoot, 'Le menu n’a pas pu être chargé.', 'error');

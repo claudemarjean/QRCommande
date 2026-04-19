@@ -847,6 +847,46 @@ export function renderOrderConfirmation(screenRoot, order) {
   animateOrderConfirmation(screenRoot);
 }
 
+function renderOrdersListMarkup(orders) {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+
+  return safeOrders.length
+    ? `
+      <section class="space-y-3">
+        ${safeOrders.map((order) => `
+          <article class="order-card" data-reveal>
+            <div class="order-card-row">
+              <div>
+                <p class="order-card-kicker">Commande</p>
+                <h3 class="order-card-title">#${escapeHtml(order.orderNumber || '')}</h3>
+              </div>
+              <span class="order-status-chip status-${escapeHtml(getOrderStatusVariant(order))}">${escapeHtml(getOrderStatusLabel(order))}</span>
+            </div>
+            <p class="order-card-reference">${escapeHtml(order.tableLabel || '')}</p>
+            ${renderOrderItemsSummary(order)}
+            <div class="order-card-meta">
+              <span>${escapeHtml(formatOrderTime(order.createdAt))}</span>
+              <span>${escapeHtml(new Date(order.createdAt || Date.now()).toLocaleDateString('fr-FR'))}</span>
+            </div>
+          </article>
+        `).join('')}
+      </section>
+    `
+    : `
+      <section class="cart-empty-state" data-reveal>
+        <div class="cart-empty-icon">
+          ${renderBottomNavIcon('orders')}
+        </div>
+        <h2 class="mt-5 text-xl font-bold text-slate-950">Aucune commande pour le moment</h2>
+        <p class="mt-2 text-sm leading-6 text-slate-600">Vos commandes validees s'afficheront ici.</p>
+        <button type="button" data-orders-menu class="hero-action mt-6 inline-flex items-center gap-2">
+          <i class="fa-solid fa-utensils"></i>
+          Voir le menu
+        </button>
+      </section>
+    `;
+}
+
 export function renderOrders(screenRoot, orders) {
   const safeOrders = Array.isArray(orders) ? orders : [];
 
@@ -864,7 +904,7 @@ export function renderOrders(screenRoot, orders) {
                 </div>
                 <div class="min-w-0">
                   <p class="event-kicker">Commandes</p>
-                  <p class="brand-subline">${safeOrders.length} commande${safeOrders.length > 1 ? 's' : ''}</p>
+                  <p class="brand-subline" data-orders-count>${safeOrders.length} commande${safeOrders.length > 1 ? 's' : ''}</p>
                 </div>
               </div>
             </div>
@@ -876,47 +916,27 @@ export function renderOrders(screenRoot, orders) {
       </div>
     </div>
     <div class="main-content page-surface">
-      <div class="px-4 pb-8 pt-5 sm:px-5">
-        ${safeOrders.length
-          ? `
-            <section class="space-y-3">
-              ${safeOrders.map((order) => `
-                <article class="order-card" data-reveal>
-                  <div class="order-card-row">
-                    <div>
-                      <p class="order-card-kicker">Commande</p>
-                      <h3 class="order-card-title">#${escapeHtml(order.orderNumber || '')}</h3>
-                    </div>
-                    <span class="order-status-chip status-${escapeHtml(getOrderStatusVariant(order))}">${escapeHtml(getOrderStatusLabel(order))}</span>
-                  </div>
-                  <p class="order-card-reference">${escapeHtml(order.tableLabel || '')}</p>
-                  ${renderOrderItemsSummary(order)}
-                  <div class="order-card-meta">
-                    <span>${escapeHtml(formatOrderTime(order.createdAt))}</span>
-                    <span>${escapeHtml(new Date(order.createdAt || Date.now()).toLocaleDateString('fr-FR'))}</span>
-                  </div>
-                </article>
-              `).join('')}
-            </section>
-          `
-          : `
-            <section class="cart-empty-state" data-reveal>
-              <div class="cart-empty-icon">
-                ${renderBottomNavIcon('orders')}
-              </div>
-              <h2 class="mt-5 text-xl font-bold text-slate-950">Aucune commande pour le moment</h2>
-              <p class="mt-2 text-sm leading-6 text-slate-600">Vos commandes validees s'afficheront ici.</p>
-              <button type="button" data-orders-menu class="hero-action mt-6 inline-flex items-center gap-2">
-                <i class="fa-solid fa-utensils"></i>
-                Voir le menu
-              </button>
-            </section>
-          `}
+      <div class="px-4 pb-8 pt-5 sm:px-5" data-orders-list-root>
+        ${renderOrdersListMarkup(safeOrders)}
       </div>
     </div>
   `;
 
   animateMenuEntrance(screenRoot);
+}
+
+export function updateOrdersList(screenRoot, orders) {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const countElement = screenRoot.querySelector('[data-orders-count]');
+  const listRoot = screenRoot.querySelector('[data-orders-list-root]');
+
+  if (!countElement || !listRoot) {
+    renderOrders(screenRoot, safeOrders);
+    return;
+  }
+
+  countElement.textContent = `${safeOrders.length} commande${safeOrders.length > 1 ? 's' : ''}`;
+  listRoot.innerHTML = renderOrdersListMarkup(safeOrders);
 }
 
 export function bindMenuActions(screenRoot, onAddToCart) {
