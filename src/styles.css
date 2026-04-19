@@ -510,17 +510,21 @@ input {
 }
 
 .article-card-inner {
-  padding: 0.85rem;
+  padding: 0.68rem 0.74rem;
 }
 
-.article-icon-shell {
-  width: 2.45rem;
-  height: 2.45rem;
-  border-radius: 0.9rem;
-  background: linear-gradient(135deg, rgba(255, 244, 223, 0.96), rgba(249, 221, 168, 0.88));
-  color: var(--plum);
-  box-shadow: 0 10px 24px rgba(215, 168, 79, 0.18);
-  flex-shrink: 0;
+.article-card-row {
+  display: block;
+}
+
+.article-main-block {
+  min-width: 0;
+}
+
+.article-meta-compact {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .category-label {
@@ -535,13 +539,21 @@ input {
   font-weight: 800;
 }
 
+.category-label.compact-article {
+  max-width: 100%;
+  padding: 0.18rem 0.48rem;
+  font-size: 0.58rem;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+
 .article-title {
   margin: 0;
   color: var(--ink);
   font-family: 'Sora', sans-serif;
-  font-size: 0.96rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.08;
   letter-spacing: -0.03em;
   min-width: 0;
   flex: 1;
@@ -550,23 +562,27 @@ input {
 .article-title-row {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.45rem;
   min-width: 0;
 }
 
 .add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 2.2rem;
-  padding: 0.55rem 0.72rem;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0.45rem 0.62rem;
   border: 0;
-  border-radius: 0.9rem;
-  font-size: 0.72rem;
+  border-radius: 0.78rem;
+  font-size: 0.68rem;
   font-weight: 800;
   white-space: nowrap;
   flex-shrink: 0;
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.add-btn i {
+  font-size: 0.72rem;
 }
 
 .add-btn.is-active {
@@ -608,21 +624,8 @@ input {
 .cart-item-body {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.8rem 0.85rem;
-}
-
-.cart-item-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.3rem;
-  height: 2.3rem;
-  border-radius: 0.85rem;
-  background: linear-gradient(135deg, rgba(255, 244, 223, 0.96), rgba(249, 221, 168, 0.88));
-  color: var(--plum);
-  box-shadow: 0 8px 18px rgba(215, 168, 79, 0.16);
-  flex-shrink: 0;
+  gap: 0.6rem;
+  padding: 0.75rem 0.8rem;
 }
 
 .cart-item-meta-row {
@@ -654,9 +657,9 @@ input {
 .cart-item-title-row {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   min-width: 0;
-  margin-top: 0.45rem;
+  margin-top: 0.38rem;
 }
 
 .cart-item-title {

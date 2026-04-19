@@ -273,7 +273,6 @@ function createCartHeaderMarkup(cartItems) {
 function renderArticleCard(article) {
   const isAvailable = Boolean(article.is_active);
   const category = article.category || 'Autres';
-  const categoryIcon = getCategoryIcon(category);
   const normalizedName = normalizeText(article.name);
   const normalizedCategory = normalizeText(category);
   const safeName = escapeHtml(article.name);
@@ -289,16 +288,14 @@ function renderArticleCard(article) {
     >
       <div class="article-card-glow"></div>
       <div class="article-card-content article-card-inner">
-        <div class="flex items-start gap-3">
-          <span class="article-icon-shell">
-            <i class="fa-solid ${categoryIcon}"></i>
-          </span>
-          <div class="min-w-0 flex-1">
-            <span class="category-label">
-              <i class="fa-solid ${categoryIcon} text-xs"></i>
-              ${safeCategory}
-            </span>
-            <div class="article-title-row mt-2">
+        <div class="article-card-row">
+          <div class="min-w-0 flex-1 article-main-block">
+            <div class="article-meta-compact">
+              <span class="category-label compact-article">
+                ${safeCategory}
+              </span>
+            </div>
+            <div class="article-title-row mt-1.5">
               <h3 class="article-title">${safeName}</h3>
               <button
                 type="button"
@@ -341,9 +338,6 @@ function renderCartItem(item) {
   return `
     <article class="cart-item" data-reveal>
       <div class="cart-item-body">
-        <span class="cart-item-icon">
-          <i class="fa-solid ${categoryIcon}"></i>
-        </span>
         <div class="min-w-0 flex-1">
           <div class="cart-item-meta-row">
             <span class="category-label compact">
