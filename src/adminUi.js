@@ -103,6 +103,98 @@ function getDashboardMetrics(orders, articles) {
   };
 }
 
+function getOrderStatusSummary(orders) {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const total = safeOrders.length;
+  const counts = safeOrders.reduce((summary, order) => {
+    const key = getOrderStatusVariant(order);
+
+    summary[key] = (summary[key] || 0) + 1;
+    return summary;
+  }, {
+    pending: 0,
+    preparing: 0,
+    served: 0,
+    cancelled: 0
+  });
+
+  const items = [
+    { key: 'pending', label: 'En attente', count: counts.pending, color: '#d7a84f' },
+    { key: 'preparing', label: 'En préparation', count: counts.preparing, color: '#b95f74' },
+    { key: 'served', label: 'Servies', count: counts.served, color: '#169b62' },
+    { key: 'cancelled', label: 'Annulées', count: counts.cancelled, color: '#7b7280' }
+  ].map((item) => ({
+    ...item,
+    percent: total ? Math.round((item.count / total) * 100) : 0
+  }));
+
+  return {
+    total,
+    items
+  };
+}
+
+function renderDashboardStatusChart(orders) {
+  const summary = getOrderStatusSummary(orders);
+  const radius = 46;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  const segments = summary.total
+    ? summary.items
+      .filter((item) => item.count > 0)
+      .map((item) => {
+        const length = (item.count / summary.total) * circumference;
+        const segment = `
+          <circle
+            class="admin-donut-segment"
+            cx="60"
+            cy="60"
+            r="${radius}"
+            fill="none"
+            stroke="${item.color}"
+            stroke-width="12"
+            stroke-linecap="round"
+            stroke-dasharray="${length} ${Math.max(circumference - length, 0)}"
+            stroke-dashoffset="-${offset}"
+          ></circle>
+        `;
+
+        offset += length;
+        return segment;
+      }).join('')
+    : '';
+
+  return `
+    <div class="admin-chart-layout" data-admin-status-chart>
+      <div class="admin-donut-shell" aria-hidden="true">
+        <svg viewBox="0 0 120 120" class="admin-donut-chart">
+          <circle class="admin-donut-track" cx="60" cy="60" r="${radius}" fill="none"></circle>
+          <g transform="rotate(-90 60 60)">
+            ${segments}
+          </g>
+        </svg>
+        <div class="admin-donut-center">
+          <strong>${summary.total}</strong>
+          <span>commande${summary.total > 1 ? 's' : ''}</span>
+        </div>
+      </div>
+
+      <div class="admin-status-legend" role="list" aria-label="Répartition des statuts de commande">
+        ${summary.items.map((item) => `
+          <div class="admin-status-legend-item" role="listitem">
+            <span class="admin-status-dot" style="background:${item.color}"></span>
+            <div class="admin-status-copy">
+              <strong>${item.label}</strong>
+              <span>${item.count} commande${item.count > 1 ? 's' : ''} · ${item.percent}%</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderAdminHeader(user, pageTitle, pageCopy) {
   const displayName = escapeHtml(user?.displayName || 'Administration');
   const email = escapeHtml(user?.email || '');
@@ -135,26 +227,6 @@ function renderAdminHeader(user, pageTitle, pageCopy) {
           </div>
         </div>
       </div>
-    </section>
-  `;
-}
-
-function renderSyncNotice(adminState) {
-  const lastSyncedAt = adminState?.lastSyncedAt
-    ? `${formatOrderTime(adminState.lastSyncedAt)} · ${formatDate(adminState.lastSyncedAt)}`
-    : 'En attente de synchronisation';
-  const hasError = Boolean(adminState?.ordersError);
-
-  return `
-    <section class="admin-sync-banner ${hasError ? 'is-error' : ''}" data-admin-reveal data-admin-sync-banner>
-      <div>
-        <span class="admin-sync-label">Synchronisation</span>
-        <p class="admin-sync-copy" data-admin-sync-copy>${escapeHtml(hasError ? adminState.ordersError : `Dernière mise à jour: ${lastSyncedAt}`)}</p>
-      </div>
-      <button type="button" class="cart-secondary-btn" data-admin-refresh ${adminState?.isLoading ? 'disabled' : ''}>
-        <i class="fa-solid fa-rotate-right"></i>
-        <span data-admin-refresh-label>${adminState?.isLoading ? 'Actualisation...' : 'Actualiser'}</span>
-      </button>
     </section>
   `;
 }
@@ -198,20 +270,30 @@ function renderDashboardPage(data) {
 
   return `
     <section class="admin-grid-panel admin-grid-panel-dashboard">
+      <article class="admin-surface-card admin-chart-card" data-admin-reveal>
+        <div class="admin-surface-head">
+          <div>
+            <span class="admin-surface-kicker">Vue d'ensemble</span>
+            <h2 class="admin-surface-title">Répartition des statuts</h2>
+          </div>
+        </div>
+        ${renderDashboardStatusChart(data.orders)}
+      </article>
+
       <div class="admin-stat-grid" data-admin-reveal>
         <article class="admin-stat-card accent-primary">
           <span class="admin-stat-label">Commandes</span>
-          <strong class="admin-stat-value">${metrics.totalOrders}</strong>
+          <strong class="admin-stat-value" data-admin-metric="total-orders">${metrics.totalOrders}</strong>
           <p class="admin-stat-copy">Flux total remonté depuis Supabase.</p>
         </article>
         <article class="admin-stat-card accent-amber">
           <span class="admin-stat-label">En attente</span>
-          <strong class="admin-stat-value">${metrics.pendingOrders}</strong>
+          <strong class="admin-stat-value" data-admin-metric="pending-orders">${metrics.pendingOrders}</strong>
           <p class="admin-stat-copy">Demandes à prendre en charge.</p>
         </article>
         <article class="admin-stat-card accent-rose">
           <span class="admin-stat-label">En préparation</span>
-          <strong class="admin-stat-value">${metrics.preparingOrders}</strong>
+          <strong class="admin-stat-value" data-admin-metric="preparing-orders">${metrics.preparingOrders}</strong>
           <p class="admin-stat-copy">Commandes en traitement côté équipe.</p>
         </article>
         <article class="admin-stat-card accent-ink">
@@ -463,7 +545,6 @@ export function renderAdminPage(screenRoot, data) {
     <div class="main-content page-surface admin-screen admin-workspace">
       ${renderAdminHeader(data?.user, page.title, page.copy)}
       <div class="admin-content-shell px-4 pb-8 pt-2 sm:px-5">
-        ${renderSyncNotice(data?.adminState)}
         ${page.render(data || {})}
       </div>
     </div>
@@ -482,12 +563,6 @@ export function bindAdminPageActions(screenRoot, { onNavigate, onRefresh, onSign
     const shortcutButton = event.target.closest('[data-admin-shortcut]');
     if (shortcutButton && typeof onNavigate === 'function') {
       onNavigate(shortcutButton.dataset.adminShortcut);
-      return;
-    }
-
-    const refreshButton = event.target.closest('[data-admin-refresh]');
-    if (refreshButton && typeof onRefresh === 'function') {
-      onRefresh();
       return;
     }
 
@@ -519,9 +594,33 @@ export function updateAdminOrdersView(screenRoot, { activeView, orders, adminSta
   }
 
   if (activeView === 'dashboard') {
-    region.innerHTML = renderOrdersFeedContent((Array.isArray(orders) ? orders : []).slice(0, 5), {
+    const safeOrders = Array.isArray(orders) ? orders : [];
+    const metrics = getDashboardMetrics(safeOrders, []);
+
+    region.innerHTML = renderOrdersFeedContent(safeOrders.slice(0, 5), {
       emptyMessage: 'Aucune commande disponible pour le moment.'
     });
+
+    const totalOrdersMetric = screenRoot.querySelector('[data-admin-metric="total-orders"]');
+    const pendingOrdersMetric = screenRoot.querySelector('[data-admin-metric="pending-orders"]');
+    const preparingOrdersMetric = screenRoot.querySelector('[data-admin-metric="preparing-orders"]');
+    const statusChart = screenRoot.querySelector('[data-admin-status-chart]');
+
+    if (totalOrdersMetric) {
+      totalOrdersMetric.textContent = String(metrics.totalOrders);
+    }
+
+    if (pendingOrdersMetric) {
+      pendingOrdersMetric.textContent = String(metrics.pendingOrders);
+    }
+
+    if (preparingOrdersMetric) {
+      preparingOrdersMetric.textContent = String(metrics.preparingOrders);
+    }
+
+    if (statusChart) {
+      statusChart.outerHTML = renderDashboardStatusChart(safeOrders);
+    }
   }
 
   if (activeView === 'admin-orders') {
@@ -534,30 +633,6 @@ export function updateAdminOrdersView(screenRoot, { activeView, orders, adminSta
     if (countElement) {
       countElement.textContent = `${safeOrders.length} commande${safeOrders.length > 1 ? 's' : ''}`;
     }
-  }
-
-  const syncBanner = screenRoot.querySelector('[data-admin-sync-banner]');
-  const syncCopy = screenRoot.querySelector('[data-admin-sync-copy]');
-  const refreshLabel = screenRoot.querySelector('[data-admin-refresh-label]');
-  const refreshButton = screenRoot.querySelector('[data-admin-refresh]');
-
-  if (syncBanner) {
-    syncBanner.classList.toggle('is-error', Boolean(adminState?.ordersError));
-  }
-
-  if (syncCopy) {
-    const lastSyncedAt = adminState?.lastSyncedAt
-      ? `${formatOrderTime(adminState.lastSyncedAt)} · ${formatDate(adminState.lastSyncedAt)}`
-      : 'En attente de synchronisation';
-    syncCopy.textContent = adminState?.ordersError || `Dernière mise à jour: ${lastSyncedAt}`;
-  }
-
-  if (refreshLabel) {
-    refreshLabel.textContent = adminState?.isLoading ? 'Actualisation...' : 'Actualiser';
-  }
-
-  if (refreshButton) {
-    refreshButton.disabled = Boolean(adminState?.isLoading);
   }
 
   return true;
