@@ -631,6 +631,14 @@ input {
   min-width: 0;
 }
 
+.cart-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
 .cart-summary-title-row {
   display: flex;
   align-items: center;
@@ -680,8 +688,10 @@ input {
 .cart-item-meta-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  justify-content: space-between;
+  gap: 0.55rem;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .category-label.compact {
@@ -701,6 +711,40 @@ input {
   color: var(--plum);
   font-size: 0.68rem;
   font-weight: 800;
+}
+
+.cart-quantity-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.cart-quantity-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid rgba(68, 38, 63, 0.08);
+  border-radius: 999px;
+  background: rgba(68, 38, 63, 0.06);
+  color: var(--plum);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.cart-quantity-symbol {
+  display: block;
+  color: currentColor;
+  font-family: 'Sora', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cart-quantity-btn:active {
+  transform: scale(0.96);
 }
 
 .cart-item-title-row {
@@ -764,6 +808,31 @@ input {
 
 .cart-secondary-btn i {
   font-size: 0.7rem;
+}
+
+.cart-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.35rem;
+  padding: 0.58rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2d2038, #8f4b4a);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 12px 24px rgba(68, 38, 63, 0.22);
+}
+
+.cart-primary-btn i {
+  font-size: 0.74rem;
+}
+
+.cart-primary-btn:active {
+  transform: scale(0.97);
 }
 
 .cart-empty-state,
@@ -1142,6 +1211,16 @@ input {
 
   .cart-summary-title-row {
     gap: 0.45rem;
+  }
+
+  .cart-summary-actions {
+    display: grid;
+    width: 100%;
+  }
+
+  .cart-secondary-btn,
+  .cart-primary-btn {
+    width: 100%;
   }
 
   .cart-item-body {

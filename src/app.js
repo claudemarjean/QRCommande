@@ -1,7 +1,7 @@
 import './styles.css';
 
 import { appConfig } from './config.js';
-import { addToCart, loadCart, persistCart, removeFromCart } from './cart.js';
+import { addToCart, loadCart, persistCart, removeFromCart, updateCartItemQuantity } from './cart.js';
 import { fetchArticles } from './supabaseClient.js';
 import {
   bindBottomNavigation,
@@ -51,6 +51,17 @@ async function bootstrap() {
     if (state.currentView === 'cart') {
       renderCart(screenRoot, state.cart);
       bindCartActions(screenRoot, {
+        onUpdateQuantity: (articleId, action) => {
+          const currentItem = state.cart.find((item) => item.id === String(articleId));
+          if (!currentItem) {
+            return;
+          }
+
+          const delta = action === 'increase' ? 1 : -1;
+          state.cart = updateCartItemQuantity(state.cart, articleId, currentItem.quantity + delta);
+          persistCart(state.cart);
+          renderCurrentView();
+        },
         onRemoveItem: (articleId) => {
           state.cart = removeFromCart(state.cart, articleId);
           persistCart(state.cart);
@@ -70,6 +81,9 @@ async function bootstrap() {
           persistCart(state.cart);
           renderCurrentView();
           showToast(toastRoot, 'Panier vidé.', 'info');
+        },
+        onCheckout: () => {
+          showToast(toastRoot, 'La prise de commande arrive bientôt.', 'info');
         }
       });
       return;

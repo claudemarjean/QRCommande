@@ -351,6 +351,7 @@ function renderCartItem(item) {
   const safeCategory = escapeHtml(item.category);
   const safeName = escapeHtml(item.name);
   const categoryIcon = getCategoryIcon(item.category);
+  const quantity = Number(item.quantity) || 1;
 
   return `
     <article class="cart-item" data-reveal>
@@ -361,7 +362,27 @@ function renderCartItem(item) {
               <i class="fa-solid ${categoryIcon} text-xs"></i>
               ${safeCategory}
             </span>
-            <span class="cart-quantity">x${item.quantity}</span>
+            <div class="cart-quantity-controls" aria-label="Quantité de ${safeName}">
+              <button
+                type="button"
+                data-quantity-action="decrease"
+                data-article-id="${item.id}"
+                class="cart-quantity-btn"
+                aria-label="Réduire la quantité de ${safeName}"
+              >
+                <span class="cart-quantity-symbol" aria-hidden="true">-</span>
+              </button>
+              <span class="cart-quantity">x${quantity}</span>
+              <button
+                type="button"
+                data-quantity-action="increase"
+                data-article-id="${item.id}"
+                class="cart-quantity-btn"
+                aria-label="Augmenter la quantité de ${safeName}"
+              >
+                <span class="cart-quantity-symbol" aria-hidden="true">+</span>
+              </button>
+            </div>
           </div>
           <div class="cart-item-title-row">
             <h3 class="cart-item-title">${safeName}</h3>
@@ -570,10 +591,16 @@ export function renderCart(screenRoot, cartItems) {
                     <h2 class="cart-summary-title">article${cartCount > 1 ? 's' : ''} dans le panier</h2>
                   </div>
                 </div>
-                <button type="button" data-back-to-menu class="cart-secondary-btn">
-                  <i class="fa-solid fa-plus"></i>
-                  Ajouter encore
-                </button>
+                <div class="cart-summary-actions">
+                  <button type="button" data-back-to-menu class="cart-secondary-btn">
+                    <i class="fa-solid fa-plus"></i>
+                    Ajouter encore
+                  </button>
+                  <button type="button" data-checkout class="cart-primary-btn">
+                    <i class="fa-solid fa-bag-shopping"></i>
+                    Passer la commande
+                  </button>
+                </div>
               </div>
               <div class="space-y-3">
                 ${cartItems.map((item) => renderCartItem(item)).join('')}
@@ -615,12 +642,21 @@ export function bindMenuActions(screenRoot, onAddToCart) {
   });
 }
 
-export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart }) {
+export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout }) {
   if (screenRoot.__cartClickHandler) {
     screenRoot.removeEventListener('click', screenRoot.__cartClickHandler);
   }
 
   const cartClickHandler = (event) => {
+    const quantityButton = event.target.closest('[data-quantity-action]');
+    if (quantityButton) {
+      onUpdateQuantity(
+        quantityButton.dataset.articleId,
+        quantityButton.dataset.quantityAction
+      );
+      return;
+    }
+
     const removeButton = event.target.closest('[data-remove-button]');
     if (removeButton) {
       onRemoveItem(removeButton.dataset.articleId);
@@ -636,6 +672,13 @@ export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClea
     const clearButton = event.target.closest('[data-cart-clear]');
     if (clearButton) {
       onClearCart();
+      return;
+    }
+
+    const checkoutButton = event.target.closest('[data-checkout]');
+    if (checkoutButton) {
+      onCheckout();
+      return;
     }
   };
 

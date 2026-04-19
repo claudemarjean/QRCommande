@@ -74,3 +74,23 @@ export function removeFromCart(cartItems, articleId) {
   const normalizedArticleId = String(articleId);
   return cartItems.filter((item) => item.id !== normalizedArticleId);
 }
+
+export function updateCartItemQuantity(cartItems, articleId, nextQuantity) {
+  const normalizedArticleId = String(articleId);
+  const safeQuantity = Number(nextQuantity);
+
+  if (!Number.isFinite(safeQuantity)) {
+    return cartItems;
+  }
+
+  if (safeQuantity <= 0) {
+    return removeFromCart(cartItems, normalizedArticleId);
+  }
+
+  return cartItems.map((item) => item.id === normalizedArticleId
+    ? {
+        ...item,
+        quantity: Math.min(appConfig.maxCartItemQuantity, Math.max(1, Math.trunc(safeQuantity)))
+      }
+    : item);
+}
