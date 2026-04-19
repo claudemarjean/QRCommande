@@ -138,6 +138,22 @@ function renderBottomNavIcon(iconName) {
   return icons[iconName] || '';
 }
 
+function renderCartEmptyIcon() {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 5.25A.75.75 0 0 1 4.25 4.5h1.14c.76 0 1.42.52 1.6 1.26l.12.49h11.48a1.75 1.75 0 0 1 1.7 2.16l-1.03 4.37a2.75 2.75 0 0 1-2.67 2.12H9.57a2.75 2.75 0 0 1-2.67-2.12L5.56 7.5h-.17l-.57-2.27a.25.25 0 0 0-.24-.19h-.33a.75.75 0 0 1-.75-.75m4.86 2.5 1 4.24c.08.35.39.6.75.6h7.02c.35 0 .66-.24.74-.58l1.03-4.26zM10 18.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m8 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"></path>
+    </svg>
+  `;
+}
+
+function renderCartEmptyBadgeIcon() {
+  return `
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H12a.75.75 0 0 1 0 1.5H8.75V12a.75.75 0 0 1-1.5 0V8.75H4a.75.75 0 0 1 0-1.5h3.25V4A.75.75 0 0 1 8 3.25"></path>
+    </svg>
+  `;
+}
+
 function createAppContainer() {
   const container = document.createElement('div');
   container.className = 'app-shell';
@@ -407,10 +423,10 @@ export function renderLoader(screenRoot) {
     <div class="state-screen state-screen-loader">
       <div class="state-card" data-reveal>
         <div class="loader-ring"></div>
-        <span class="state-chip">Chargement live</span>
-        <div class="space-y-2 text-center">
-          <h2 class="state-title">Le menu de l’événement se prépare</h2>
-          <p class="state-copy">Nous mettons en scène la carte pour une navigation fluide et rapide sur mobile.</p>
+        <span class="state-chip state-chip-loader">Chargement live</span>
+        <div class="state-copy-block text-center">
+          <h2 class="state-title state-title-loader">Le menu de l’événement se prépare</h2>
+          <p class="state-copy state-copy-loader">Nous mettons en scène la carte pour une navigation fluide et rapide sur mobile.</p>
         </div>
       </div>
     </div>
@@ -546,11 +562,15 @@ export function renderCart(screenRoot, cartItems) {
           ? `
             <section class="space-y-4">
               <div class="cart-summary" data-reveal>
-                <div>
+                <div class="cart-summary-copy">
                   <p class="cart-summary-kicker">Résumé</p>
-                  <h2 class="mt-1 text-base font-bold text-slate-950">${cartCount} article${cartCount > 1 ? 's' : ''} dans le panier</h2>
+                  <div class="cart-summary-title-row mt-1">
+                    <span class="cart-summary-count">${cartCount}</span>
+                    <h2 class="cart-summary-title">article${cartCount > 1 ? 's' : ''} dans le panier</h2>
+                  </div>
                 </div>
                 <button type="button" data-back-to-menu class="cart-secondary-btn">
+                  <i class="fa-solid fa-plus"></i>
                   Ajouter encore
                 </button>
               </div>
@@ -562,7 +582,10 @@ export function renderCart(screenRoot, cartItems) {
           : `
             <section class="cart-empty-state" data-reveal>
               <div class="cart-empty-icon">
-                <i class="fa-solid fa-basket-shopping"></i>
+                ${renderCartEmptyIcon()}
+                <span class="cart-empty-icon-badge">
+                  ${renderCartEmptyBadgeIcon()}
+                </span>
               </div>
               <h2 class="mt-5 text-xl font-bold text-slate-950">Votre panier est vide</h2>
               <p class="mt-2 text-sm leading-6 text-slate-600">Ajoutez quelques articles depuis le menu pour les retrouver ici.</p>
