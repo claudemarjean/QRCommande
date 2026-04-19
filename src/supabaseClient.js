@@ -23,7 +23,9 @@ export async function fetchArticles() {
       return demoArticles;
     }
 
-    throw new Error('Configuration Supabase manquante. Ajoutez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.');
+    // Note dev : si cette erreur survient hors mode demo, verifiez VITE_SUPABASE_URL
+    // et VITE_SUPABASE_ANON_KEY dans la configuration d'environnement locale/deploiement.
+    throw new Error('Erreur de configuration E_CFG_001. Contactez l\'administrateur.');
   }
 
   const { data, error } = await supabase
