@@ -223,8 +223,9 @@ function createTopBarMarkup(categories, totalItems) {
               <div class="app-logo-frame">
                 <img src="/assets/logo-app.png" alt="Logo QRCommande" class="app-logo-image" />
               </div>
-              <div class="min-w-0">
+              <div class="min-w-0 brand-lockup">
                 <p class="event-kicker">QRCommande</p>
+                <p class="brand-subline">Liste des articles</p>
               </div>
             </div>
           </div>
