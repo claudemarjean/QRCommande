@@ -30,6 +30,7 @@ Cette première version implémente :
 - la vérification d'activation de l'événement
 - l'affichage d'un menu premium responsive
 - le chargement des articles depuis Supabase
+- la validation de commande avec creation de `orders` puis `order_items`
 - un mode démo pour prévisualiser l'interface sans credentials
 
 Note produit : avec le schéma fourni (`id`, `name`, `category`, `is_active`), le champ `is_active` est utilisé comme indicateur de disponibilité visuelle dans le menu. Si tu veux à la fois filtrer strictement les lignes actives côté requête et afficher des cartes indisponibles, il faudra ajouter un second champ métier dédié à la disponibilité.
@@ -81,3 +82,17 @@ Table `articles` :
 - `name`
 - `category`
 - `is_active`
+
+Table `orders` :
+
+- `id`
+- `order_number`
+- `status`
+- `created_at`
+
+Table `order_items` :
+
+- `id`
+- `order_id`
+- `product`
+- `quantity`

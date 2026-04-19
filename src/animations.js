@@ -94,3 +94,56 @@ export function animateToast(toastElement) {
     { y: 0, opacity: 1, duration: 0.35, ease: 'power2.out' }
   );
 }
+
+export function animateOrderConfirmation(rootElement) {
+  if (!rootElement) {
+    return;
+  }
+
+  const confirmationCard = rootElement.querySelector('[data-confirmation-card]');
+  const checkmark = rootElement.querySelector('[data-confirmation-check]');
+  const reveals = rootElement.querySelectorAll('[data-confirmation-reveal]');
+
+  const timeline = gsap.timeline({
+    defaults: { ease: 'power3.out' },
+    onComplete: () => {
+      gsap.set([confirmationCard, checkmark, reveals], { clearProps: 'all' });
+    }
+  });
+
+  if (confirmationCard) {
+    timeline.fromTo(
+      confirmationCard,
+      { y: 24, opacity: 0, scale: 0.98 },
+      { y: 0, opacity: 1, scale: 1, duration: 0.48 }
+    );
+  }
+
+  if (checkmark) {
+    timeline.fromTo(
+      checkmark,
+      { scale: 0.6, opacity: 0, rotate: -14 },
+      { scale: 1, opacity: 1, rotate: 0, duration: 0.42, ease: 'back.out(1.7)' },
+      '-=0.2'
+    );
+
+    timeline.to(
+      checkmark,
+      {
+        boxShadow: '0 20px 40px rgba(22, 155, 98, 0.28)',
+        duration: 0.28,
+        yoyo: true,
+        repeat: 1
+      },
+      '-=0.05'
+    );
+  }
+
+  if (reveals.length) {
+    timeline.from(
+      reveals,
+      { y: 14, opacity: 0, duration: 0.34, stagger: 0.06 },
+      '-=0.22'
+    );
+  }
+}

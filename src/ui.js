@@ -1,4 +1,4 @@
-import { animateLoader, animateMenuEntrance, animateToast, stopLoader } from './animations.js';
+import { animateLoader, animateMenuEntrance, animateOrderConfirmation, animateToast, stopLoader } from './animations.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -11,6 +11,25 @@ function escapeHtml(value) {
 
 function getCartCount(cartItems) {
   return cartItems.reduce((total, item) => total + Number(item.quantity || 0), 0);
+}
+
+function formatOrderTime(value) {
+  const date = value ? new Date(value) : new Date();
+
+  return new Intl.DateTimeFormat('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
+function getOrderStatusLabel(status) {
+  const labels = {
+    pending: 'En attente',
+    preparing: 'En preparation',
+    served: 'Servie'
+  };
+
+  return labels[String(status || '').toLowerCase()] || 'En attente';
 }
 
 function normalizeText(value) {
@@ -175,7 +194,7 @@ function createAppContainer() {
           </span>
           <span class="bottom-nav-label text-xs font-semibold">Panier</span>
         </button>
-        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-slate-500" disabled>
+        <button data-nav-target="orders" class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-slate-500">
           <span class="bottom-nav-icon-shell">
             ${renderBottomNavIcon('orders')}
           </span>
@@ -274,6 +293,7 @@ function createCartHeaderMarkup(cartItems) {
                 </div>
                 <div class="min-w-0">
                   <p class="event-kicker">Panier</p>
+                  <p class="brand-subline">${cartCount} article${cartCount > 1 ? 's' : ''}</p>
                 </div>
               </div>
             </div>
@@ -575,11 +595,27 @@ export function renderMenu(screenRoot, articles) {
 
 export function renderCart(screenRoot, cartItems) {
   const cartCount = getCartCount(cartItems);
+  const options = arguments[2] || {};
+  const errorMessage = options.errorMessage ? escapeHtml(options.errorMessage) : '';
+  const isSubmitting = Boolean(options.isSubmitting);
 
   screenRoot.innerHTML = `
     ${createCartHeaderMarkup(cartItems)}
     <div class="main-content page-surface">
       <div class="px-4 pb-8 pt-5 sm:px-5">
+        ${errorMessage
+          ? `
+            <section class="cart-feedback cart-feedback-error" data-reveal>
+              <div class="cart-feedback-icon">
+                <i class="fa-solid fa-circle-exclamation"></i>
+              </div>
+              <div class="min-w-0">
+                <h3 class="cart-feedback-title">Validation impossible</h3>
+                <p class="cart-feedback-copy">${errorMessage}</p>
+              </div>
+            </section>
+          `
+          : ''}
         ${cartItems.length
           ? `
             <section class="space-y-4">
@@ -592,13 +628,21 @@ export function renderCart(screenRoot, cartItems) {
                   </div>
                 </div>
                 <div class="cart-summary-actions">
-                  <button type="button" data-back-to-menu class="cart-secondary-btn">
+                  <button type="button" data-back-to-menu class="cart-secondary-btn" ${isSubmitting ? 'disabled' : ''}>
                     <i class="fa-solid fa-plus"></i>
                     Ajouter encore
                   </button>
-                  <button type="button" data-checkout class="cart-primary-btn">
-                    <i class="fa-solid fa-bag-shopping"></i>
-                    Passer la commande
+                  <button type="button" data-checkout class="cart-primary-btn ${isSubmitting ? 'is-loading' : ''}" ${isSubmitting ? 'disabled aria-busy="true"' : ''}>
+                    <span class="cart-primary-btn-content ${isSubmitting ? 'opacity-0' : ''}">
+                      <i class="fa-solid fa-bag-shopping"></i>
+                      Valider la commande
+                    </span>
+                    ${isSubmitting
+                      ? `
+                        <span class="cart-btn-loader" aria-hidden="true"></span>
+                        <span class="cart-btn-loading-copy">Envoi...</span>
+                      `
+                      : ''}
                   </button>
                 </div>
               </div>
@@ -630,6 +674,115 @@ export function renderCart(screenRoot, cartItems) {
   animateMenuEntrance(screenRoot);
 }
 
+export function renderOrderConfirmation(screenRoot, order) {
+  const orderNumber = escapeHtml(order?.orderNumber || '');
+  const orderTime = escapeHtml(formatOrderTime(order?.createdAt));
+
+  screenRoot.innerHTML = `
+    <div class="main-content page-surface confirmation-screen">
+      <div class="px-4 pb-8 pt-6 sm:px-5">
+        <section class="confirmation-card" data-confirmation-card>
+          <div class="confirmation-aura"></div>
+          <div class="confirmation-check" data-confirmation-check>
+            <i class="fa-solid fa-check"></i>
+          </div>
+          <span class="confirmation-chip" data-confirmation-reveal>Commande confirmée</span>
+          <div class="confirmation-copy-block" data-confirmation-reveal>
+            <h1 class="confirmation-title">Votre commande est bien enregistrée</h1>
+            <p class="confirmation-copy">Elle a été transmise à l’équipe avec le statut en attente de préparation.</p>
+          </div>
+          <div class="confirmation-details" data-confirmation-reveal>
+            <div class="confirmation-detail-card">
+              <span class="confirmation-detail-label">Numéro de commande</span>
+              <strong class="confirmation-detail-value">${orderNumber}</strong>
+            </div>
+            <div class="confirmation-detail-card">
+              <span class="confirmation-detail-label">Heure</span>
+              <strong class="confirmation-detail-value">${orderTime}</strong>
+            </div>
+          </div>
+          <button type="button" data-new-order class="confirmation-action" data-confirmation-reveal>
+            <i class="fa-solid fa-rotate-right"></i>
+            Nouvelle commande
+          </button>
+        </section>
+      </div>
+    </div>
+  `;
+
+  animateOrderConfirmation(screenRoot);
+}
+
+export function renderOrders(screenRoot, orders) {
+  const safeOrders = Array.isArray(orders) ? orders : [];
+
+  screenRoot.innerHTML = `
+    <div class="top-app-bar top-app-bar-cart">
+      <div class="page-orb page-orb-left"></div>
+      <div class="page-orb page-orb-right"></div>
+      <div class="px-4 pb-4 pt-4 sm:px-5">
+        <div data-hero class="event-hero compact">
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-2 min-w-0">
+              <div class="flex items-center gap-3" data-reveal>
+                <div class="app-logo-frame">
+                  <img src="/assets/logo-app.png" alt="Logo QRCommande" class="app-logo-image" />
+                </div>
+                <div class="min-w-0">
+                  <p class="event-kicker">Commandes</p>
+                  <p class="brand-subline">${safeOrders.length} commande${safeOrders.length > 1 ? 's' : ''}</p>
+                </div>
+              </div>
+            </div>
+            <button type="button" data-orders-menu class="hero-action" data-reveal>
+              Menu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="main-content page-surface">
+      <div class="px-4 pb-8 pt-5 sm:px-5">
+        ${safeOrders.length
+          ? `
+            <section class="space-y-3">
+              ${safeOrders.map((order) => `
+                <article class="order-card" data-reveal>
+                  <div class="order-card-row">
+                    <div>
+                      <p class="order-card-kicker">Commande</p>
+                      <h3 class="order-card-title">#${escapeHtml(order.orderNumber || '')}</h3>
+                    </div>
+                    <span class="order-status-chip">${escapeHtml(getOrderStatusLabel(order.status))}</span>
+                  </div>
+                  <div class="order-card-meta">
+                    <span>${escapeHtml(formatOrderTime(order.createdAt))}</span>
+                    <span>${escapeHtml(new Date(order.createdAt || Date.now()).toLocaleDateString('fr-FR'))}</span>
+                  </div>
+                </article>
+              `).join('')}
+            </section>
+          `
+          : `
+            <section class="cart-empty-state" data-reveal>
+              <div class="cart-empty-icon">
+                ${renderBottomNavIcon('orders')}
+              </div>
+              <h2 class="mt-5 text-xl font-bold text-slate-950">Aucune commande pour le moment</h2>
+              <p class="mt-2 text-sm leading-6 text-slate-600">Vos commandes validees s'afficheront ici.</p>
+              <button type="button" data-orders-menu class="hero-action mt-6 inline-flex items-center gap-2">
+                <i class="fa-solid fa-utensils"></i>
+                Voir le menu
+              </button>
+            </section>
+          `}
+      </div>
+    </div>
+  `;
+
+  animateMenuEntrance(screenRoot);
+}
+
 export function bindMenuActions(screenRoot, onAddToCart) {
   screenRoot.querySelectorAll('[data-add-button]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -642,7 +795,7 @@ export function bindMenuActions(screenRoot, onAddToCart) {
   });
 }
 
-export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout }) {
+export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout, onNewOrder }) {
   if (screenRoot.__cartClickHandler) {
     screenRoot.removeEventListener('click', screenRoot.__cartClickHandler);
   }
@@ -680,10 +833,32 @@ export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClea
       onCheckout();
       return;
     }
+
+    const newOrderButton = event.target.closest('[data-new-order]');
+    if (newOrderButton) {
+      onNewOrder();
+      return;
+    }
   };
 
   screenRoot.__cartClickHandler = cartClickHandler;
   screenRoot.addEventListener('click', cartClickHandler);
+}
+
+export function bindOrdersActions(screenRoot, { onBackToMenu }) {
+  if (screenRoot.__ordersClickHandler) {
+    screenRoot.removeEventListener('click', screenRoot.__ordersClickHandler);
+  }
+
+  const ordersClickHandler = (event) => {
+    const menuButton = event.target.closest('[data-orders-menu]');
+    if (menuButton) {
+      onBackToMenu();
+    }
+  };
+
+  screenRoot.__ordersClickHandler = ordersClickHandler;
+  screenRoot.addEventListener('click', ordersClickHandler);
 }
 
 export function showToast(toastRoot, message, variant = 'info') {

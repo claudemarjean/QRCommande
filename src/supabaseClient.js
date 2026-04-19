@@ -72,3 +72,106 @@ export async function fetchArticles() {
     ? data.map(normalizeArticle).filter(Boolean)
     : [];
 }
+
+function normalizeOrderRecord(record, fallbackDate) {
+  const createdAt = record?.created_at || fallbackDate;
+
+  return {
+    id: record?.id ?? null,
+    orderNumber: String(record?.order_number || ''),
+    status: String(record?.status || 'pending'),
+    createdAt
+  };
+}
+
+function isMissingColumnError(error, columnName) {
+  return Boolean(error?.message) && new RegExp(`\\b${columnName}\\b`, 'i').test(error.message);
+}
+
+function isRowLevelSecurityError(error) {
+  return /row-level security policy/i.test(error?.message || '');
+}
+
+function formatSupabaseWriteError(error) {
+  if (isRowLevelSecurityError(error)) {
+    return new Error('Insertion bloquée par Supabase (RLS) sur les commandes. Ajoutez une policy INSERT pour les roles anon/authenticated sur orders et order_items.');
+  }
+
+  return new Error(error?.message || 'Impossible de créer la commande.');
+}
+
+async function insertOrderRecord() {
+  let response = await supabase
+    .from('orders')
+    .insert({
+      status: 'pending'
+    })
+    .select('id, order_number, status, created_at')
+    .single();
+
+  if (response.error && isMissingColumnError(response.error, 'created_at')) {
+    response = await supabase
+      .from('orders')
+      .insert({
+        status: 'pending'
+      })
+      .select('id, order_number, status, created_at')
+      .single();
+  }
+
+  if (response.error) {
+    throw formatSupabaseWriteError(response.error);
+  }
+
+  return response.data;
+}
+
+async function insertOrderItems(orderId, cartItems) {
+  const rows = cartItems.map((item) => ({
+    order_id: orderId,
+    article_id: item.id,
+    quantity: Math.max(1, Number(item.quantity) || 1)
+  }));
+
+  const response = await supabase
+    .from('order_items')
+    .insert(rows);
+
+  if (response.error) {
+    throw formatSupabaseWriteError(response.error);
+  }
+}
+
+async function createDemoOrder(cartItems) {
+  await new Promise((resolve) => window.setTimeout(resolve, 900));
+
+  return normalizeOrderRecord(
+    {
+      id: `demo-${Date.now()}`,
+      order_number: `${Math.floor(Date.now() / 1000)}`,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    },
+    new Date().toISOString()
+  );
+}
+
+export async function createOrder(cartItems) {
+  if (!Array.isArray(cartItems) || cartItems.length === 0) {
+    throw new Error('Votre panier est vide. Ajoutez au moins un article avant de valider.');
+  }
+
+  if (!supabase) {
+    if (appConfig.useDemoData) {
+      return createDemoOrder(cartItems);
+    }
+
+    throw new Error('Erreur de configuration E_CFG_002. Contactez l\'administrateur.');
+  }
+
+  const createdAt = new Date().toISOString();
+  const orderRow = await insertOrderRecord();
+  const normalizedOrder = normalizeOrderRecord(orderRow, createdAt);
+  await insertOrderItems(normalizedOrder.id, cartItems);
+  return normalizedOrder;
+}
