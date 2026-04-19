@@ -1,5 +1,7 @@
 import './styles.css';
 
+import { appConfig } from './config.js';
+import { addToCart, loadCart, persistCart, removeFromCart } from './cart.js';
 import { fetchArticles } from './supabaseClient.js';
 import {
   bindBottomNavigation,
@@ -16,12 +18,6 @@ import {
   updateCartBadge
 } from './ui.js';
 
-const CART_STORAGE_KEY = 'qrcommande-cart';
-
-async function checkAppStatus() {
-  return String(import.meta.env.VITE_APP_ACTIVE ?? 'true').toLowerCase() === 'true';
-}
-
 function sortArticles(articles) {
   return [...articles].sort((left, right) => {
     const categoryCompare = (left.category || '').localeCompare(right.category || '', 'fr');
@@ -32,61 +28,6 @@ function sortArticles(articles) {
 
     return (left.name || '').localeCompare(right.name || '', 'fr');
   });
-}
-
-function loadCart() {
-  try {
-    const rawCart = window.localStorage.getItem(CART_STORAGE_KEY);
-    if (!rawCart) {
-      return [];
-    }
-
-    const parsedCart = JSON.parse(rawCart);
-    if (!Array.isArray(parsedCart)) {
-      return [];
-    }
-
-    return parsedCart
-      .filter((item) => item && typeof item === 'object' && item.id !== undefined && item.id !== null)
-      .map((item) => ({
-        id: String(item.id),
-        name: String(item.name || ''),
-        category: String(item.category || 'Autres'),
-        quantity: Math.max(1, Number(item.quantity) || 1)
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function persistCart(cartItems) {
-  window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
-}
-
-function addToCart(cartItems, article) {
-  const articleId = String(article.id);
-  const existingItem = cartItems.find((item) => item.id === articleId);
-
-  if (existingItem) {
-    return cartItems.map((item) => item.id === articleId
-      ? { ...item, quantity: item.quantity + 1 }
-      : item);
-  }
-
-  return [
-    ...cartItems,
-    {
-      id: articleId,
-      name: article.name,
-      category: article.category || 'Autres',
-      quantity: 1
-    }
-  ];
-}
-
-function removeFromCart(cartItems, articleId) {
-  const normalizedArticleId = String(articleId);
-  return cartItems.filter((item) => item.id !== normalizedArticleId);
 }
 
 async function bootstrap() {
@@ -151,7 +92,7 @@ async function bootstrap() {
   try {
     await new Promise((resolve) => window.setTimeout(resolve, 550));
 
-    if (!(await checkAppStatus())) {
+    if (!appConfig.isAppActive) {
       stopLoading();
       renderInactiveState(screenRoot);
       return;

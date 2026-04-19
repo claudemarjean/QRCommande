@@ -1,5 +1,14 @@
 import { animateLoader, animateToast, stopLoader } from './animations.js';
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getCartCount(cartItems) {
   return cartItems.reduce((total, item) => total + Number(item.quantity || 0), 0);
 }
@@ -145,7 +154,7 @@ function createTopBarMarkup(categories, totalItems) {
   const filterCategories = ['all', ...categories];
   const tabs = filterCategories.map((category, index) => {
     const isAll = category === 'all';
-    const label = isAll ? 'Toutes' : category;
+    const label = escapeHtml(isAll ? 'Toutes' : category);
     const icon = isAll ? 'fa-table-cells-large' : getCategoryIcon(category);
 
     return `
@@ -238,21 +247,23 @@ function renderArticleCard(article) {
   const categoryIcon = getCategoryIcon(category);
   const normalizedName = normalizeText(article.name);
   const normalizedCategory = normalizeText(category);
+  const safeName = escapeHtml(article.name);
+  const safeCategory = escapeHtml(category);
 
   return `
     <article
       data-article-card
-      data-article-name="${normalizedName}"
-      data-article-category="${normalizedCategory}"
+      data-article-name="${escapeHtml(normalizedName)}"
+      data-article-category="${escapeHtml(normalizedCategory)}"
       class="article-card ${isAvailable ? 'available' : 'unavailable'}"
     >
       <div class="p-4">
         <div class="flex items-start justify-between gap-3 mb-3">
           <div class="flex-1 min-w-0">
-            <h3 class="font-bold text-gray-900 text-base mb-1.5 leading-tight truncate">${article.name}</h3>
+            <h3 class="font-bold text-gray-900 text-base mb-1.5 leading-tight truncate">${safeName}</h3>
             <span class="category-label">
               <i class="fa-solid ${categoryIcon} text-xs"></i>
-              ${category}
+              ${safeCategory}
             </span>
           </div>
           <span class="status-badge ${isAvailable ? 'available' : 'unavailable'} flex-shrink-0">
@@ -275,8 +286,8 @@ function renderArticleCard(article) {
             ${isAvailable ? '' : 'disabled'}
             data-add-button
             data-article-id="${article.id}"
-            data-article-name="${article.name}"
-            data-article-category="${category}"
+            data-article-name="${safeName}"
+            data-article-category="${safeCategory}"
           >
             <i class="fa-solid fa-plus"></i>
             <span>Ajouter</span>
@@ -379,7 +390,7 @@ export function renderErrorState(screenRoot, message) {
           <i class="fa-solid fa-triangle-exclamation text-3xl text-white"></i>
         </div>
         <h1 class="mt-6 text-2xl font-bold text-gray-800">Erreur de chargement</h1>
-        <p class="mt-3 text-gray-600 text-sm leading-relaxed">${message}</p>
+        <p class="mt-3 text-gray-600 text-sm leading-relaxed">${escapeHtml(message)}</p>
         <button class="mt-6 px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold rounded-xl shadow-lg">
           Réessayer
         </button>
@@ -409,7 +420,7 @@ export function renderMenu(screenRoot, articles) {
                 <span class="section-icon">
                   <i class="fa-solid ${getCategoryIcon(category)}"></i>
                 </span>
-                <span>${category}</span>
+                <span>${escapeHtml(category)}</span>
               </h2>
               <span class="text-xs text-gray-500 font-medium">${categoriesMap[category].length} article${categoriesMap[category].length > 1 ? 's' : ''}</span>
             </div>
@@ -459,6 +470,9 @@ export function renderMenu(screenRoot, articles) {
 }
 
 function renderCartItem(item) {
+  const safeCategory = escapeHtml(item.category);
+  const safeName = escapeHtml(item.name);
+
   return `
     <article class="cart-item rounded-3xl bg-white p-4 shadow-sm">
       <div class="flex items-start justify-between gap-3">
@@ -466,18 +480,18 @@ function renderCartItem(item) {
           <div class="flex items-center gap-2">
             <span class="category-label">
               <i class="fa-solid ${getCategoryIcon(item.category)} text-xs"></i>
-              ${item.category}
+              ${safeCategory}
             </span>
             <span class="cart-quantity">x${item.quantity}</span>
           </div>
-          <h3 class="mt-3 text-base font-bold text-gray-900">${item.name}</h3>
+          <h3 class="mt-3 text-base font-bold text-gray-900">${safeName}</h3>
         </div>
         <button
           type="button"
           data-remove-button
           data-article-id="${item.id}"
           class="cart-remove-btn"
-          aria-label="Supprimer ${item.name} du panier"
+          aria-label="Supprimer ${safeName} du panier"
         >
           <i class="fa-solid fa-trash-can text-sm"></i>
           <span>Supprimer</span>
@@ -584,12 +598,18 @@ export function showToast(toastRoot, message, variant = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast animate__animated animate__fadeInRight rounded-2xl px-4 py-3 ${styles[variant] || styles.info}`;
-  toast.innerHTML = `
-    <div class="flex items-center gap-3">
-      <i class="fa-solid ${icons[variant] || icons.info} text-xl"></i>
-      <p class="text-sm font-semibold">${message}</p>
-    </div>
-  `;
+  const content = document.createElement('div');
+  content.className = 'flex items-center gap-3';
+
+  const icon = document.createElement('i');
+  icon.className = `fa-solid ${icons[variant] || icons.info} text-xl`;
+
+  const text = document.createElement('p');
+  text.className = 'text-sm font-semibold';
+  text.textContent = String(message || '');
+
+  content.append(icon, text);
+  toast.appendChild(content);
 
   toastRoot.appendChild(toast);
   animateToast(toast);

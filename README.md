@@ -43,6 +43,22 @@ Note produit : avec le schéma fourni (`id`, `name`, `category`, `is_active`), l
 - Animate.css
 - Supabase JS
 
+## Architecture
+
+- [src/app.js](src/app.js) orchestre le cycle de vie de l'application et la navigation principale
+- [src/config.js](src/config.js) centralise la configuration d'environnement et les garde-fous applicatifs
+- [src/cart.js](src/cart.js) isole la logique panier et la persistance locale
+- [src/supabaseClient.js](src/supabaseClient.js) encapsule l'accès aux données et normalise les articles
+- [src/ui.js](src/ui.js) concentre le rendu et les interactions DOM
+- [src/animations.js](src/animations.js) isole les animations GSAP
+
+Principes appliqués:
+
+- responsabilité unique par module
+- validation des données externes avant usage UI
+- réduction du couplage entre orchestration, stockage et accès réseau
+- rendu HTML durci contre les injections de contenu
+
 ## Démarrage
 
 1. Copier `.env.example` vers `.env`

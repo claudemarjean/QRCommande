@@ -1,8 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const useDemoData = String(import.meta.env.VITE_USE_DEMO_DATA).toLowerCase() === 'true';
+import { appConfig } from './config.js';
 
 const demoArticles = [
   { id: 1, name: 'Champagne Signature', category: 'Cocktails', is_active: true },
@@ -13,14 +10,47 @@ const demoArticles = [
   { id: 6, name: 'Macaron ivoire', category: 'Desserts', is_active: false }
 ];
 
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = appConfig.supabaseUrl && appConfig.supabaseAnonKey
+  ? createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      },
+      global: {
+        headers: {
+          'X-Client-Info': 'qrcommande-web'
+        }
+      }
+    })
   : null;
+
+function normalizeText(value, fallback = 'Autres') {
+  const normalizedValue = String(value ?? fallback)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, appConfig.maxTextLength);
+
+  return normalizedValue || fallback;
+}
+
+function normalizeArticle(record) {
+  if (!record || typeof record !== 'object' || record.id === undefined || record.id === null) {
+    return null;
+  }
+
+  return {
+    id: String(record.id),
+    name: normalizeText(record.name, 'Article'),
+    category: normalizeText(record.category, 'Autres'),
+    is_active: Boolean(record.is_active)
+  };
+}
 
 export async function fetchArticles() {
   if (!supabase) {
-    if (useDemoData) {
-      return demoArticles;
+    if (appConfig.useDemoData) {
+      return demoArticles.map(normalizeArticle).filter(Boolean);
     }
 
     // Note dev : si cette erreur survient hors mode demo, verifiez VITE_SUPABASE_URL
@@ -38,5 +68,7 @@ export async function fetchArticles() {
     throw new Error(error.message || 'Impossible de récupérer les articles.');
   }
 
-  return data;
+  return Array.isArray(data)
+    ? data.map(normalizeArticle).filter(Boolean)
+    : [];
 }
