@@ -1598,6 +1598,44 @@ input {
   font-weight: 700;
 }
 
+.order-card-items {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(68, 38, 63, 0.06);
+}
+
+.order-card-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.order-card-item-name {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.order-card-item-qty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(68, 38, 63, 0.08);
+  color: var(--plum);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 @keyframes cart-button-spin {
   to {
     transform: rotate(360deg);

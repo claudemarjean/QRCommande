@@ -39,7 +39,19 @@ function loadOrders() {
     const rawOrders = window.localStorage.getItem(appConfig.ordersStorageKey);
     const parsedOrders = JSON.parse(rawOrders || '[]');
 
-    return Array.isArray(parsedOrders) ? parsedOrders : [];
+    return Array.isArray(parsedOrders)
+      ? parsedOrders.map((order) => ({
+          ...order,
+          items: Array.isArray(order?.items)
+            ? order.items
+                .map((item) => ({
+                  name: String(item?.name || '').trim().slice(0, appConfig.maxTextLength),
+                  quantity: Math.max(1, Number(item?.quantity) || 1)
+                }))
+                .filter((item) => item.name)
+            : []
+        }))
+      : [];
   } catch {
     return [];
   }
@@ -51,6 +63,13 @@ function persistOrders(orders) {
   } catch {
     // Ignore storage failures to keep the orders view usable.
   }
+}
+
+function createOrderItemsSnapshot(cartItems) {
+  return cartItems.map((item) => ({
+    name: String(item?.name || '').trim().slice(0, appConfig.maxTextLength),
+    quantity: Math.max(1, Number(item?.quantity) || 1)
+  })).filter((item) => item.name);
 }
 
 async function bootstrap() {
@@ -175,12 +194,17 @@ async function bootstrap() {
           renderCurrentView();
 
           try {
+            const orderItemsSnapshot = createOrderItemsSnapshot(state.cart);
             const order = await createOrder(state.cart, state.checkout.tableLabel);
+            const orderWithItems = {
+              ...order,
+              items: orderItemsSnapshot
+            };
             state.cart = [];
-            state.orders = [order, ...state.orders.filter((entry) => entry.id !== order.id)].slice(0, 10);
+            state.orders = [orderWithItems, ...state.orders.filter((entry) => entry.id !== order.id)].slice(0, 10);
             state.checkout.isSubmitting = false;
             state.checkout.tableLabel = '';
-            state.checkout.lastOrder = order;
+            state.checkout.lastOrder = orderWithItems;
             state.currentView = 'confirmation';
             persistCart(state.cart);
             persistOrders(state.orders);

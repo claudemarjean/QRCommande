@@ -427,6 +427,25 @@ function renderCartItem(item) {
   `;
 }
 
+function renderOrderItemsSummary(order) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+
+  if (!items.length) {
+    return '';
+  }
+
+  return `
+    <div class="order-card-items">
+      ${items.map((item) => `
+        <div class="order-card-item-row">
+          <span class="order-card-item-name">${escapeHtml(item.name || '')}</span>
+          <span class="order-card-item-qty">x${Math.max(1, Number(item.quantity) || 1)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 export function mountBaseLayout(rootElement) {
   const app = createAppContainer();
   rootElement.replaceChildren(app);
@@ -842,6 +861,7 @@ export function renderOrders(screenRoot, orders) {
                     <span class="order-status-chip">${escapeHtml(getOrderStatusLabel(order.status))}</span>
                   </div>
                   <p class="order-card-reference">${escapeHtml(order.tableLabel || '')}</p>
+                  ${renderOrderItemsSummary(order)}
                   <div class="order-card-meta">
                     <span>${escapeHtml(formatOrderTime(order.createdAt))}</span>
                     <span>${escapeHtml(new Date(order.createdAt || Date.now()).toLocaleDateString('fr-FR'))}</span>
