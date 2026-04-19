@@ -4,11 +4,13 @@ import { appConfig } from './config.js';
 import { addToCart, loadCart, persistCart, removeFromCart, updateCartItemQuantity } from './cart.js';
 import { createOrder, fetchArticles, reconcileStoredOrders } from './supabaseClient.js';
 import {
+  bindAdminLoginActions,
   bindBottomNavigation,
   bindCartActions,
   bindMenuActions,
   bindOrdersActions,
   mountBaseLayout,
+  renderAdminLogin,
   renderCart,
   renderErrorState,
   renderInactiveState,
@@ -119,6 +121,13 @@ async function bootstrap() {
     ordersSyncPromise: null,
     ordersSyncInProgress: false,
     ordersPollingTimer: null,
+    account: {
+      email: '',
+      password: '',
+      errorMessage: '',
+      isSubmitting: false,
+      showPassword: false
+    },
     checkout: {
       isSubmitting: false,
       errorMessage: '',
@@ -390,6 +399,52 @@ async function bootstrap() {
         onBackToMenu: () => {
           state.currentView = 'menu';
           renderCurrentView();
+        }
+      });
+      return;
+    }
+
+    if (state.currentView === 'account') {
+      renderAdminLogin(screenRoot, state.account);
+      bindAdminLoginActions(screenRoot, {
+        onEmailChange: (value) => {
+          state.account.email = value;
+          if (state.account.errorMessage) {
+            state.account.errorMessage = '';
+            renderCurrentView();
+          }
+        },
+        onPasswordChange: (value) => {
+          state.account.password = value;
+          if (state.account.errorMessage) {
+            state.account.errorMessage = '';
+            renderCurrentView();
+          }
+        },
+        onTogglePassword: () => {
+          state.account.showPassword = !state.account.showPassword;
+          renderCurrentView();
+        },
+        onSubmit: async () => {
+          const email = String(state.account.email || '').trim();
+          const password = String(state.account.password || '');
+
+          if (!email || !password) {
+            state.account.errorMessage = 'Renseignez vos identifiants administrateur.';
+            renderCurrentView();
+            return;
+          }
+
+          state.account.isSubmitting = true;
+          state.account.errorMessage = '';
+          renderCurrentView();
+
+          await new Promise((resolve) => window.setTimeout(resolve, 700));
+
+          state.account.isSubmitting = false;
+          state.account.errorMessage = 'Connexion admin non branchée dans cette version.';
+          renderCurrentView();
+          showToast(toastRoot, 'Connexion admin non disponible pour le moment.', 'info');
         }
       });
       return;

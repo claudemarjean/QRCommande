@@ -147,3 +147,45 @@ export function animateOrderConfirmation(rootElement) {
     );
   }
 }
+
+export function animateAdminAccess(rootElement) {
+  if (!rootElement) {
+    return;
+  }
+
+  const panel = rootElement.querySelector('[data-admin-panel]');
+  const signal = rootElement.querySelector('[data-admin-signal]');
+  const reveals = rootElement.querySelectorAll('[data-admin-reveal]');
+
+  const timeline = gsap.timeline({
+    defaults: { ease: 'power3.out' },
+    onComplete: () => {
+      gsap.set([panel, signal, reveals], { clearProps: 'all' });
+    }
+  });
+
+  if (panel) {
+    timeline.fromTo(
+      panel,
+      { y: 26, opacity: 0, scale: 0.985 },
+      { y: 0, opacity: 1, scale: 1, duration: 0.5 }
+    );
+  }
+
+  if (signal) {
+    timeline.fromTo(
+      signal,
+      { opacity: 0, scale: 0.82, rotate: -10 },
+      { opacity: 1, scale: 1, rotate: 0, duration: 0.42, ease: 'back.out(1.5)' },
+      '-=0.28'
+    );
+  }
+
+  if (reveals.length) {
+    timeline.from(
+      reveals,
+      { y: 16, opacity: 0, duration: 0.34, stagger: 0.05 },
+      '-=0.2'
+    );
+  }
+}

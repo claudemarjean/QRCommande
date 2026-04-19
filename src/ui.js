@@ -1,4 +1,4 @@
-import { animateLoader, animateMenuEntrance, animateOrderConfirmation, animateToast, stopLoader } from './animations.js';
+import { animateAdminAccess, animateLoader, animateMenuEntrance, animateOrderConfirmation, animateToast, stopLoader } from './animations.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -200,6 +200,15 @@ function renderCartEmptyBadgeIcon() {
   `;
 }
 
+function renderAccountBadgeIcon() {
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2.75l7 2.5v5.3c0 4.62-2.86 8.86-7 10.45-4.14-1.59-7-5.83-7-10.45v-5.3zm0 2.12L6.5 6.8v3.75c0 3.62 2.08 6.96 5.5 8.42 3.42-1.46 5.5-4.8 5.5-8.42V6.8z"></path>
+      <path d="M12 8.15a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2m-3.15 7.25a.75.75 0 0 1-.75-.75 3.9 3.9 0 0 1 7.8 0 .75.75 0 0 1-1.5 0 2.4 2.4 0 0 0-4.8 0 .75.75 0 0 1-.75.75"></path>
+    </svg>
+  `;
+}
+
 function createAppContainer() {
   const container = document.createElement('div');
   container.className = 'app-shell';
@@ -227,7 +236,7 @@ function createAppContainer() {
           </span>
           <span class="bottom-nav-label text-xs font-semibold">Commandes</span>
         </button>
-        <button class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-slate-500" disabled>
+        <button data-nav-target="account" class="bottom-nav-item flex flex-col items-center gap-1 px-4 py-2 text-slate-500">
           <span class="bottom-nav-icon-shell">
             ${renderBottomNavIcon('account')}
           </span>
@@ -847,6 +856,101 @@ export function renderOrderConfirmation(screenRoot, order) {
   animateOrderConfirmation(screenRoot);
 }
 
+export function renderAdminLogin(screenRoot, accountState = {}) {
+  const email = escapeHtml(accountState?.email || '');
+  const password = escapeHtml(accountState?.password || '');
+  const errorMessage = escapeHtml(accountState?.errorMessage || '');
+  const isSubmitting = Boolean(accountState?.isSubmitting);
+  const showPassword = Boolean(accountState?.showPassword);
+
+  screenRoot.innerHTML = `
+    <div class="main-content page-surface admin-screen">
+      <div class="px-4 pb-8 pt-5 sm:px-5">
+        <section class="admin-panel" data-admin-panel>
+          <div class="admin-panel-orb admin-panel-orb-left"></div>
+          <div class="admin-panel-orb admin-panel-orb-right"></div>
+          <div class="admin-panel-head">
+            <div class="admin-signal" data-admin-signal>
+              ${renderAccountBadgeIcon()}
+            </div>
+            <div class="admin-copy-block" data-admin-reveal>
+              <span class="admin-kicker">Espace admin</span>
+              <h1 class="admin-title">Accès admin uniquement</h1>
+              <p class="admin-copy">Pour commander, aucun compte n’est nécessaire.</p>
+            </div>
+            <div class="admin-note" data-admin-reveal>
+              <strong>Public</strong>
+              <p>Le menu client reste libre d’accès.</p>
+            </div>
+          </div>
+
+          <div class="admin-grid">
+            <form class="admin-login-card" data-admin-login-form data-admin-reveal>
+              <div class="admin-login-topline">
+                <span class="admin-login-chip">Connexion sécurisée</span>
+                <p class="admin-login-caption">Identifiants staff uniquement.</p>
+              </div>
+
+              <label class="admin-field">
+                <span class="admin-field-label">Email admin</span>
+                <span class="admin-input-shell">
+                  <i class="fa-solid fa-envelope admin-input-icon"></i>
+                  <input
+                    type="email"
+                    name="email"
+                    value="${email}"
+                    placeholder="admin@evenement.fr"
+                    class="admin-input"
+                    autocomplete="username"
+                    inputmode="email"
+                    ${isSubmitting ? 'disabled' : ''}
+                  />
+                </span>
+              </label>
+
+              <label class="admin-field">
+                <span class="admin-field-label">Mot de passe</span>
+                <span class="admin-input-shell admin-input-shell-password">
+                  <i class="fa-solid fa-lock admin-input-icon"></i>
+                  <input
+                    type="${showPassword ? 'text' : 'password'}"
+                    name="password"
+                    value="${password}"
+                    placeholder="Votre accès administrateur"
+                    class="admin-input"
+                    autocomplete="current-password"
+                    ${isSubmitting ? 'disabled' : ''}
+                  />
+                  <button type="button" class="admin-toggle-password" data-toggle-admin-password ${isSubmitting ? 'disabled' : ''}>
+                    <i class="fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}"></i>
+                  </button>
+                </span>
+              </label>
+
+              ${errorMessage
+                ? `<p class="admin-error" data-admin-error>${errorMessage}</p>`
+                : '<p class="admin-hint" data-admin-error>Réservé aux administrateurs de l’événement.</p>'}
+
+              <button type="submit" class="admin-login-button ${isSubmitting ? 'is-loading' : ''}" ${isSubmitting ? 'disabled' : ''}>
+                <span>${isSubmitting ? 'Connexion...' : 'Connexion admin'}</span>
+                <i class="fa-solid fa-arrow-right-long"></i>
+              </button>
+            </form>
+
+            <article class="admin-info-card" data-admin-reveal>
+              <span class="admin-info-pill">Réservé au staff</span>
+              <h2 class="admin-info-title">Gestion interne</h2>
+              <p class="admin-info-copy">Cet accès sert au suivi et à l’exploitation.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+
+  animateAdminAccess(screenRoot);
+}
+
 function renderOrdersListMarkup(orders) {
   const safeOrders = Array.isArray(orders) ? orders : [];
 
@@ -1054,6 +1158,38 @@ export function bindOrdersActions(screenRoot, { onBackToMenu }) {
 
   screenRoot.__ordersClickHandler = ordersClickHandler;
   screenRoot.addEventListener('click', ordersClickHandler);
+}
+
+export function bindAdminLoginActions(screenRoot, { onEmailChange, onPasswordChange, onTogglePassword, onSubmit }) {
+  const form = screenRoot.querySelector('[data-admin-login-form]');
+  const emailInput = screenRoot.querySelector('input[name="email"]');
+  const passwordInput = screenRoot.querySelector('input[name="password"]');
+  const toggleButton = screenRoot.querySelector('[data-toggle-admin-password]');
+
+  if (emailInput && typeof onEmailChange === 'function') {
+    emailInput.addEventListener('input', (event) => {
+      onEmailChange(event.target.value);
+    });
+  }
+
+  if (passwordInput && typeof onPasswordChange === 'function') {
+    passwordInput.addEventListener('input', (event) => {
+      onPasswordChange(event.target.value);
+    });
+  }
+
+  if (toggleButton && typeof onTogglePassword === 'function') {
+    toggleButton.addEventListener('click', () => {
+      onTogglePassword();
+    });
+  }
+
+  if (form && typeof onSubmit === 'function') {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      onSubmit();
+    });
+  }
 }
 
 export function showToast(toastRoot, message, variant = 'info') {
