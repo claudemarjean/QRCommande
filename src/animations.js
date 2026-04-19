@@ -25,11 +25,12 @@ export function animateMenuEntrance(rootElement) {
   const hero = rootElement.querySelector('[data-hero]');
   const categories = rootElement.querySelectorAll('[data-category-block]');
   const cards = rootElement.querySelectorAll('[data-article-card]');
+  const reveals = rootElement.querySelectorAll('[data-reveal]');
 
   const timeline = gsap.timeline({
     defaults: { ease: 'power3.out' },
     onComplete: () => {
-      gsap.set([hero, categories, cards], { clearProps: 'all' });
+      gsap.set([hero, categories, cards, reveals], { clearProps: 'all' });
     }
   });
 
@@ -65,6 +66,19 @@ export function animateMenuEntrance(rootElement) {
         stagger: 0.02
       },
       '-=0.2'
+    );
+  }
+
+  if (reveals.length) {
+    timeline.from(
+      reveals,
+      {
+        y: 14,
+        opacity: 0,
+        duration: 0.4,
+        stagger: 0.04
+      },
+      hero || categories.length || cards.length ? '-=0.25' : 0
     );
   }
 }
