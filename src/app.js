@@ -17,6 +17,7 @@ import {
   renderOrderConfirmation,
   renderOrders,
   showToast,
+  updateCartScreen,
   updateBottomNavigation,
   updateCartBadge
 } from './ui.js';
@@ -98,7 +99,14 @@ async function bootstrap() {
           state.cart = updateCartItemQuantity(state.cart, articleId, currentItem.quantity + delta);
           state.checkout.errorMessage = '';
           persistCart(state.cart);
-          renderCurrentView();
+          updateCartBadge(appRoot, state.cart);
+
+          if (state.cart.length === 0) {
+            renderCurrentView();
+            return;
+          }
+
+          updateCartScreen(screenRoot, state.cart, { articleId });
         },
         onRemoveItem: (articleId) => {
           if (state.checkout.isSubmitting) {

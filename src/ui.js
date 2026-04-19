@@ -13,6 +13,10 @@ function getCartCount(cartItems) {
   return cartItems.reduce((total, item) => total + Number(item.quantity || 0), 0);
 }
 
+function formatArticleCount(count, suffix = '') {
+  return `${count} article${count > 1 ? 's' : ''}${suffix}`;
+}
+
 function formatOrderTime(value) {
   const date = value ? new Date(value) : new Date();
 
@@ -293,11 +297,11 @@ function createCartHeaderMarkup(cartItems) {
                 </div>
                 <div class="min-w-0">
                   <p class="event-kicker">Panier</p>
-                  <p class="brand-subline">${cartCount} article${cartCount > 1 ? 's' : ''}</p>
+                  <p class="brand-subline" data-cart-header-count>${formatArticleCount(cartCount)}</p>
                 </div>
               </div>
             </div>
-            <button type="button" data-cart-clear class="hero-action ${cartCount === 0 ? 'pointer-events-none opacity-50' : ''}" data-reveal>
+            <button type="button" data-cart-clear class="hero-action ${cartCount === 0 ? 'pointer-events-none opacity-50' : ''}" data-reveal ${cartCount === 0 ? 'disabled' : ''}>
               Vider
             </button>
           </div>
@@ -374,7 +378,7 @@ function renderCartItem(item) {
   const quantity = Number(item.quantity) || 1;
 
   return `
-    <article class="cart-item" data-reveal>
+    <article class="cart-item" data-reveal data-cart-item data-article-id="${item.id}">
       <div class="cart-item-body">
         <div class="min-w-0 flex-1">
           <div class="cart-item-meta-row">
@@ -392,7 +396,7 @@ function renderCartItem(item) {
               >
                 <span class="cart-quantity-symbol" aria-hidden="true">-</span>
               </button>
-              <span class="cart-quantity">x${quantity}</span>
+              <span class="cart-quantity" data-cart-item-quantity>x${quantity}</span>
               <button
                 type="button"
                 data-quantity-action="increase"
@@ -458,6 +462,58 @@ export function updateCartBadge(appRoot, cartItems) {
   const count = getCartCount(cartItems);
   badge.hidden = count === 0;
   badge.textContent = String(count);
+}
+
+export function updateCartScreen(screenRoot, cartItems, options = {}) {
+  const safeCartItems = Array.isArray(cartItems) ? cartItems : [];
+  const cartCount = getCartCount(safeCartItems);
+  const targetArticleId = options.articleId ? String(options.articleId) : '';
+
+  const headerCount = screenRoot.querySelector('[data-cart-header-count]');
+  if (headerCount) {
+    headerCount.textContent = formatArticleCount(cartCount);
+  }
+
+  const summaryCount = screenRoot.querySelector('.cart-summary-count');
+  if (summaryCount) {
+    summaryCount.textContent = String(cartCount);
+  }
+
+  const summaryTitle = screenRoot.querySelector('.cart-summary-title');
+  if (summaryTitle) {
+    summaryTitle.textContent = `${formatArticleCount(cartCount, ' dans le panier')}`;
+  }
+
+  const clearButton = screenRoot.querySelector('[data-cart-clear]');
+  if (clearButton) {
+    const isEmpty = cartCount === 0;
+    clearButton.disabled = isEmpty;
+    clearButton.classList.toggle('pointer-events-none', isEmpty);
+    clearButton.classList.toggle('opacity-50', isEmpty);
+  }
+
+  if (!targetArticleId) {
+    return;
+  }
+
+  const itemElement = screenRoot.querySelector(`[data-cart-item][data-article-id="${targetArticleId}"]`);
+  const nextItem = safeCartItems.find((item) => item.id === targetArticleId);
+
+  if (!nextItem) {
+    if (itemElement) {
+      itemElement.remove();
+    }
+    return;
+  }
+
+  if (!itemElement) {
+    return;
+  }
+
+  const quantityLabel = itemElement.querySelector('[data-cart-item-quantity]');
+  if (quantityLabel) {
+    quantityLabel.textContent = `x${Number(nextItem.quantity) || 1}`;
+  }
 }
 
 export function renderLoader(screenRoot) {
@@ -626,7 +682,7 @@ export function renderCart(screenRoot, cartItems) {
                   <p class="cart-summary-kicker">Résumé</p>
                   <div class="cart-summary-title-row mt-1">
                     <span class="cart-summary-count">${cartCount}</span>
-                    <h2 class="cart-summary-title">article${cartCount > 1 ? 's' : ''} dans le panier</h2>
+                    <h2 class="cart-summary-title">${formatArticleCount(cartCount, ' dans le panier')}</h2>
                   </div>
                 </div>
                 <div class="cart-summary-panel">
