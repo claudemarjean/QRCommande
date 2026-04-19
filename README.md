@@ -87,12 +87,22 @@ Table `orders` :
 
 - `id`
 - `order_number`
-- `status`
+- `table_label`
+- `created_at`
+- `status` (UUID vers `order_statuses.id`)
+
+Table `order_statuses` :
+
+- `id`
+- `code`
+- `label`
+- `is_active`
+- `position`
 - `created_at`
 
 Table `order_items` :
 
 - `id`
 - `order_id`
-- `product`
+- `article_id`
 - `quantity`

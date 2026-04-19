@@ -26,14 +26,19 @@ function formatOrderTime(value) {
   }).format(date);
 }
 
-function getOrderStatusLabel(status) {
+function getOrderStatusLabel(order) {
+  if (order?.statusLabel) {
+    return String(order.statusLabel);
+  }
+
   const labels = {
     pending: 'En attente',
     preparing: 'En preparation',
     served: 'Servie'
   };
 
-  return labels[String(status || '').toLowerCase()] || 'En attente';
+  const statusCode = String(order?.statusCode || order?.status || '').toLowerCase();
+  return labels[statusCode] || 'En attente';
 }
 
 function normalizeText(value) {
@@ -864,7 +869,7 @@ export function renderOrders(screenRoot, orders) {
                       <p class="order-card-kicker">Commande</p>
                       <h3 class="order-card-title">#${escapeHtml(order.orderNumber || '')}</h3>
                     </div>
-                    <span class="order-status-chip">${escapeHtml(getOrderStatusLabel(order.status))}</span>
+                    <span class="order-status-chip">${escapeHtml(getOrderStatusLabel(order))}</span>
                   </div>
                   <p class="order-card-reference">${escapeHtml(order.tableLabel || '')}</p>
                   ${renderOrderItemsSummary(order)}

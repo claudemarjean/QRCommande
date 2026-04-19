@@ -25,6 +25,14 @@ export const supabase = appConfig.supabaseUrl && appConfig.supabaseAnonKey
     })
   : null;
 
+let cachedActiveOrderStatuses = null;
+
+const fallbackPendingStatus = Object.freeze({
+  id: appConfig.defaultOrderPendingStatusId,
+  code: appConfig.defaultOrderPendingStatusCode,
+  label: appConfig.defaultOrderPendingStatusLabel
+});
+
 function normalizeText(value, fallback = 'Autres') {
   const normalizedValue = String(value ?? fallback)
     .replace(/\s+/g, ' ')
@@ -32,6 +40,61 @@ function normalizeText(value, fallback = 'Autres') {
     .slice(0, appConfig.maxTextLength);
 
   return normalizedValue || fallback;
+}
+
+function normalizeLabel(value, fallback = '') {
+  const normalizedValue = String(value ?? fallback)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, appConfig.maxTextLength);
+
+  return normalizedValue || fallback;
+}
+
+function normalizeStatusCode(value, fallback = 'pending') {
+  return normalizeText(value, fallback)
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+}
+
+function getLegacyOrderStatusLabel(code) {
+  const labels = {
+    pending: 'En attente',
+    preparing: 'En preparation',
+    served: 'Servie'
+  };
+
+  return labels[normalizeStatusCode(code, 'pending')] || 'En attente';
+}
+
+function normalizeStatusRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return {
+      id: '',
+      code: 'pending',
+      label: 'En attente'
+    };
+  }
+
+  const code = normalizeStatusCode(record.code || '', 'pending');
+
+  return {
+    id: record.id ? String(record.id) : '',
+    code,
+    label: normalizeLabel(record.label, getLegacyOrderStatusLabel(code))
+  };
+}
+
+function getFallbackPendingStatus() {
+  return {
+    id: String(fallbackPendingStatus.id || ''),
+    code: normalizeStatusCode(fallbackPendingStatus.code, 'pending'),
+    label: normalizeLabel(fallbackPendingStatus.label, 'En attente')
+  };
+}
+
+function isUuidLike(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
 function normalizeArticle(record) {
@@ -75,14 +138,68 @@ export async function fetchArticles() {
 
 function normalizeOrderRecord(record, fallbackDate) {
   const createdAt = record?.created_at || fallbackDate;
+  const relationStatus = record?.status_details;
+  const legacyStatusCode = !relationStatus && typeof record?.status === 'string' && !isUuidLike(record.status)
+    ? normalizeStatusCode(record.status, 'pending')
+    : normalizeStatusCode(record?.statusCode || '', 'pending');
+  const statusRecord = relationStatus
+    ? normalizeStatusRecord(relationStatus)
+    : {
+        id: record?.statusId ? String(record.statusId) : (isUuidLike(record?.status) ? String(record.status) : ''),
+        code: legacyStatusCode,
+        label: normalizeLabel(record?.statusLabel, getLegacyOrderStatusLabel(legacyStatusCode))
+      };
 
   return {
     id: record?.id ?? null,
     orderNumber: String(record?.order_number || ''),
     tableLabel: normalizeText(record?.table_label, ''),
-    status: String(record?.status || 'pending'),
+    status: statusRecord.code,
+    statusId: statusRecord.id,
+    statusCode: statusRecord.code,
+    statusLabel: statusRecord.label,
     createdAt
   };
+}
+
+async function fetchActiveOrderStatuses() {
+  if (cachedActiveOrderStatuses) {
+    return cachedActiveOrderStatuses;
+  }
+
+  const { data, error } = await supabase
+    .from('order_statuses')
+    .select('id, code, label, is_active, position, created_at')
+    .eq('is_active', true)
+    .order('position', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return [];
+  }
+
+  cachedActiveOrderStatuses = Array.isArray(data)
+    ? data.map(normalizeStatusRecord).filter((status) => status.id)
+    : [];
+
+  return cachedActiveOrderStatuses;
+}
+
+async function resolveInitialOrderStatus() {
+  const fallbackStatus = getFallbackPendingStatus();
+  const statuses = await fetchActiveOrderStatuses();
+
+  if (!statuses.length) {
+    if (fallbackStatus.id) {
+      return fallbackStatus;
+    }
+
+    throw new Error('Aucun statut exploitable disponible pour initialiser la commande. Configurez le statut pending dans order_statuses ou VITE_DEFAULT_ORDER_PENDING_STATUS_ID.');
+  }
+
+  return statuses.find((status) => status.code === fallbackStatus.code)
+    || statuses[0]
+    || fallbackStatus;
 }
 
 function isMissingColumnError(error, columnName) {
@@ -111,11 +228,11 @@ function formatSupabaseWriteError(error) {
   return new Error(error?.message || 'Impossible de créer la commande.');
 }
 
-async function insertOrderRecordAttempt(tableLabel, selectColumns) {
+async function insertOrderRecordAttempt(tableLabel, statusId, selectColumns) {
   return supabase
     .from('orders')
     .insert({
-      status: 'pending',
+      status: statusId,
       table_label: tableLabel
     })
     .select(selectColumns)
@@ -124,17 +241,20 @@ async function insertOrderRecordAttempt(tableLabel, selectColumns) {
 
 async function insertOrderRecord(tableLabel) {
   const normalizedTableLabel = normalizeText(tableLabel, '');
+  const initialStatus = await resolveInitialOrderStatus();
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     let response = await insertOrderRecordAttempt(
       normalizedTableLabel,
-      'id, order_number, table_label, status, created_at'
+      initialStatus.id,
+      'id, order_number, table_label, created_at, status, status_details:status(id, code, label)'
     );
 
     if (response.error && isMissingColumnError(response.error, 'created_at')) {
       response = await insertOrderRecordAttempt(
         normalizedTableLabel,
-        'id, order_number, table_label, status'
+        initialStatus.id,
+        'id, order_number, table_label, status, status_details:status(id, code, label)'
       );
     }
 
@@ -182,7 +302,9 @@ async function createDemoOrder(cartItems, tableLabel) {
       id: `demo-${Date.now()}`,
       order_number: `DEMO-${randomToken}`,
       table_label: normalizeText(tableLabel, ''),
-      status: 'pending',
+      statusId: fallbackPendingStatus.id,
+      statusCode: fallbackPendingStatus.code,
+      statusLabel: fallbackPendingStatus.label,
       created_at: new Date().toISOString()
     },
     new Date().toISOString()

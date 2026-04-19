@@ -42,6 +42,10 @@ function loadOrders() {
     return Array.isArray(parsedOrders)
       ? parsedOrders.map((order) => ({
           ...order,
+          statusId: order?.statusId ? String(order.statusId) : '',
+          statusCode: String(order?.statusCode || order?.status || 'pending').trim() || 'pending',
+          statusLabel: String(order?.statusLabel || '').trim() || 'En attente',
+          status: String(order?.statusCode || order?.status || 'pending').trim() || 'pending',
           items: Array.isArray(order?.items)
             ? order.items
                 .map((item) => ({
@@ -198,6 +202,7 @@ async function bootstrap() {
             const order = await createOrder(state.cart, state.checkout.tableLabel);
             const orderWithItems = {
               ...order,
+              status: order.statusCode || order.status,
               items: orderItemsSnapshot
             };
             state.cart = [];

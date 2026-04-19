@@ -25,12 +25,16 @@ function isValidSupabaseUrl(value) {
 
 const supabaseUrl = normalizeEnvString(import.meta.env.VITE_SUPABASE_URL);
 const supabaseAnonKey = normalizeEnvString(import.meta.env.VITE_SUPABASE_ANON_KEY);
+const defaultOrderPendingStatusId = normalizeEnvString(import.meta.env.VITE_DEFAULT_ORDER_PENDING_STATUS_ID) || '93cc19cc-a7d1-433b-84a0-6c8f231e7aad';
 
 export const appConfig = Object.freeze({
   isAppActive: parseBoolean(import.meta.env.VITE_APP_ACTIVE, true),
   useDemoData: parseBoolean(import.meta.env.VITE_USE_DEMO_DATA, false),
   supabaseUrl: isValidSupabaseUrl(supabaseUrl) ? supabaseUrl : '',
   supabaseAnonKey,
+  defaultOrderPendingStatusId,
+  defaultOrderPendingStatusCode: 'pending',
+  defaultOrderPendingStatusLabel: 'En attente',
   cartStorageKey: 'qrcommande-cart',
   ordersStorageKey: 'qrcommande-orders',
   maxCartEntries: 50,
