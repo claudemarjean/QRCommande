@@ -232,29 +232,18 @@ function createCartHeaderMarkup(cartItems) {
         <div data-hero class="event-hero compact">
           <div class="flex items-start justify-between gap-3">
             <div class="space-y-2 min-w-0">
-              <span class="event-badge warm" data-reveal>
-                <i class="fa-solid fa-basket-shopping"></i>
-                Sélection en cours
-              </span>
               <div class="flex items-center gap-3" data-reveal>
-                <div class="cart-header-icon">
-                  <i class="fa-solid fa-basket-shopping text-white text-lg"></i>
+                <div class="app-logo-frame">
+                  <img src="/assets/logo-app.png" alt="Logo QRCommande" class="app-logo-image" />
                 </div>
                 <div class="min-w-0">
                   <p class="event-kicker">Panier</p>
-                  <h1 class="event-title">Finalisez vos choix rapidement</h1>
                 </div>
               </div>
             </div>
             <button type="button" data-cart-clear class="hero-action ${cartCount === 0 ? 'pointer-events-none opacity-50' : ''}" data-reveal>
               Vider
             </button>
-          </div>
-          <div class="event-stats single" data-reveal>
-            <div class="event-stat-card accent">
-              <span class="event-stat-label">Panier</span>
-              <strong class="event-stat-value">${cartCount} article${cartCount > 1 ? 's' : ''} sélectionné${cartCount > 1 ? 's' : ''}</strong>
-            </div>
           </div>
         </div>
       </div>
@@ -328,30 +317,36 @@ function groupArticlesByCategory(articles) {
 function renderCartItem(item) {
   const safeCategory = escapeHtml(item.category);
   const safeName = escapeHtml(item.name);
+  const categoryIcon = getCategoryIcon(item.category);
 
   return `
-    <article class="cart-item rounded-3xl p-4 shadow-sm" data-reveal>
-      <div class="flex items-start justify-between gap-3">
+    <article class="cart-item" data-reveal>
+      <div class="cart-item-body">
+        <span class="cart-item-icon">
+          <i class="fa-solid ${categoryIcon}"></i>
+        </span>
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <span class="category-label">
-              <i class="fa-solid ${getCategoryIcon(item.category)} text-xs"></i>
+          <div class="cart-item-meta-row">
+            <span class="category-label compact">
+              <i class="fa-solid ${categoryIcon} text-xs"></i>
               ${safeCategory}
             </span>
             <span class="cart-quantity">x${item.quantity}</span>
           </div>
-          <h3 class="mt-3 text-base font-bold text-slate-950">${safeName}</h3>
+          <div class="cart-item-title-row">
+            <h3 class="cart-item-title">${safeName}</h3>
+            <button
+              type="button"
+              data-remove-button
+              data-article-id="${item.id}"
+              class="cart-remove-btn"
+              aria-label="Supprimer ${safeName} du panier"
+            >
+              <i class="fa-solid fa-trash-can text-sm"></i>
+              <span>Retirer</span>
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          data-remove-button
-          data-article-id="${item.id}"
-          class="cart-remove-btn"
-          aria-label="Supprimer ${safeName} du panier"
-        >
-          <i class="fa-solid fa-trash-can text-sm"></i>
-          <span>Supprimer</span>
-        </button>
       </div>
     </article>
   `;
@@ -540,7 +535,7 @@ export function renderCart(screenRoot, cartItems) {
               <div class="cart-summary" data-reveal>
                 <div>
                   <p class="cart-summary-kicker">Résumé</p>
-                  <h2 class="mt-2 text-lg font-bold text-slate-950">${cartCount} article${cartCount > 1 ? 's' : ''} dans le panier</h2>
+                  <h2 class="mt-1 text-base font-bold text-slate-950">${cartCount} article${cartCount > 1 ? 's' : ''} dans le panier</h2>
                 </div>
                 <button type="button" data-back-to-menu class="cart-secondary-btn">
                   Ajouter encore
