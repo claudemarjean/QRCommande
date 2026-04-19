@@ -183,9 +183,6 @@ function createTopBarMarkup(categories, totalItems) {
       <div class="page-orb page-orb-right"></div>
       <div class="px-4 pb-3 pt-4 sm:px-5">
         <div data-hero class="event-hero">
-          <div class="event-corner-stat" data-reveal>
-            <strong class="event-corner-value" data-visible-count>${totalItems} articles affichés</strong>
-          </div>
           <div class="space-y-2 min-w-0">
             <div class="flex items-center gap-3" data-reveal>
               <div class="app-logo-frame">
@@ -197,19 +194,24 @@ function createTopBarMarkup(categories, totalItems) {
             </div>
           </div>
         </div>
-        <div class="search-bar flex items-center gap-3 px-4 py-3" data-reveal>
-          <i class="fa-solid fa-magnifying-glass text-white/70"></i>
-          <input
-            type="text"
-            placeholder="Rechercher une boisson, un snack, un dessert..."
-            class="flex-1 bg-transparent text-white placeholder-white/60 outline-none text-sm"
-            id="search-input"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            enterkeyhint="search"
-          />
+        <div class="search-row" data-reveal>
+          <div class="search-bar flex items-center gap-3 px-4 py-3">
+            <i class="fa-solid fa-magnifying-glass text-white/70"></i>
+            <input
+              type="text"
+              placeholder="Rechercher une boisson, un snack, un dessert..."
+              class="flex-1 bg-transparent text-white placeholder-white/60 outline-none text-sm"
+              id="search-input"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              enterkeyhint="search"
+            />
+          </div>
+          <div class="event-corner-stat event-corner-stat-inline">
+            <strong class="event-corner-value" data-visible-count>${totalItems} articles affichés</strong>
+          </div>
         </div>
       </div>
       <div class="category-tabs px-4 pb-4 sm:px-5" data-reveal>
@@ -278,41 +280,32 @@ function renderArticleCard(article) {
       data-reveal
     >
       <div class="article-card-glow"></div>
-      <div class="article-card-content p-4">
-        <div class="flex items-start justify-between gap-3 mb-4">
+      <div class="article-card-content article-card-inner">
+        <div class="flex items-start gap-3">
           <span class="article-icon-shell">
             <i class="fa-solid ${categoryIcon}"></i>
           </span>
-          <span class="status-badge ${isAvailable ? 'available' : 'unavailable'} flex-shrink-0">
-            ${isAvailable ? 'Disponible' : 'Épuisé'}
-          </span>
-        </div>
-        <div class="space-y-3">
-          <div>
+          <div class="min-w-0 flex-1">
             <span class="category-label">
               <i class="fa-solid ${categoryIcon} text-xs"></i>
               ${safeCategory}
             </span>
-            <h3 class="article-title mt-3">${safeName}</h3>
+            <div class="article-title-row mt-2">
+              <h3 class="article-title">${safeName}</h3>
+              <button
+                type="button"
+                class="add-btn ${isAvailable ? 'is-active' : 'is-disabled'}"
+                ${isAvailable ? '' : 'disabled'}
+                data-add-button
+                data-article-id="${article.id}"
+                data-article-name="${safeName}"
+                data-article-category="${safeCategory}"
+              >
+                <i class="fa-solid ${isAvailable ? 'fa-plus' : 'fa-ban'}"></i>
+                <span>${isAvailable ? 'Ajouter' : 'Stock'}</span>
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="flex items-center justify-between gap-3 mt-5">
-          <div class="article-presence ${isAvailable ? 'available' : 'unavailable'}">
-            <span class="presence-dot"></span>
-            ${isAvailable ? 'Préparation immédiate' : 'Retour prochainement'}
-          </div>
-          <button
-            type="button"
-            class="add-btn ${isAvailable ? 'is-active' : 'is-disabled'}"
-            ${isAvailable ? '' : 'disabled'}
-            data-add-button
-            data-article-id="${article.id}"
-            data-article-name="${safeName}"
-            data-article-category="${safeCategory}"
-          >
-            <i class="fa-solid ${isAvailable ? 'fa-plus' : 'fa-ban'}"></i>
-            <span>${isAvailable ? 'Ajouter' : 'Indisponible'}</span>
-          </button>
         </div>
       </div>
     </article>
