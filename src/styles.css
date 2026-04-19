@@ -748,15 +748,63 @@ input {
   backdrop-filter: blur(18px);
 }
 
+.bottom-nav-shell {
+  gap: 0.15rem;
+}
+
 .bottom-nav-item {
   position: relative;
-  color: var(--muted);
-  transition: transform 0.2s ease, color 0.2s ease;
+  min-width: 4.3rem;
+  min-height: 4.15rem;
+  color: #596172;
+  border-radius: 1.25rem;
+  transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.bottom-nav-icon-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(68, 38, 63, 0.08);
+  background: rgba(68, 38, 63, 0.1);
+  color: #596172;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bottom-nav-icon-shell svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  fill: currentColor;
+}
+
+.bottom-nav-label {
+  letter-spacing: -0.01em;
 }
 
 .bottom-nav-item.active {
   color: var(--plum);
   transform: translateY(-1px);
+  background: rgba(68, 38, 63, 0.04);
+}
+
+.bottom-nav-item.active .bottom-nav-icon-shell {
+  background: linear-gradient(135deg, rgba(68, 38, 63, 0.96), rgba(143, 75, 74, 0.92));
+  color: white;
+  box-shadow: 0 10px 22px rgba(68, 38, 63, 0.2);
+}
+
+.bottom-nav-item:disabled .bottom-nav-icon-shell {
+  background: rgba(68, 38, 63, 0.06);
+  color: rgba(89, 97, 114, 0.78);
+}
+
+.bottom-nav-item:active .bottom-nav-icon-shell {
+  transform: scale(0.96);
 }
 
 .bottom-nav-item:disabled {
