@@ -188,7 +188,7 @@ function createTopBarMarkup(categories, totalItems) {
     return `
       <button
         data-category-tab="${isAll ? 'all' : slugify(category)}"
-        class="category-tab px-4 py-2 text-sm font-semibold transition ${index === 0 ? 'active' : 'text-white/75'}"
+        class="category-tab px-3 py-1.5 text-xs font-semibold transition ${index === 0 ? 'active' : 'text-white/75'}"
       >
         <i class="fa-solid ${icon} text-[0.8rem]"></i>
         <span>${label}</span>
@@ -200,10 +200,10 @@ function createTopBarMarkup(categories, totalItems) {
     <div class="top-app-bar">
       <div class="page-orb page-orb-left"></div>
       <div class="page-orb page-orb-right"></div>
-      <div class="px-4 pb-3 pt-4 sm:px-5">
+      <div class="top-bar-inner px-4 pb-2 pt-3 sm:px-5">
         <div data-hero class="event-hero">
           <div class="space-y-2 min-w-0">
-            <div class="flex items-center gap-3" data-reveal>
+            <div class="flex items-center gap-2.5" data-reveal>
               <div class="app-logo-frame">
                 <img src="/assets/logo-app.png" alt="Logo QRCommande" class="app-logo-image" />
               </div>
@@ -214,12 +214,12 @@ function createTopBarMarkup(categories, totalItems) {
           </div>
         </div>
         <div class="search-row" data-reveal>
-          <div class="search-bar flex items-center gap-3 px-4 py-3">
-            <i class="fa-solid fa-magnifying-glass text-white/70"></i>
+          <div class="search-bar flex items-center gap-2.5 px-3 py-2.5">
+            <i class="fa-solid fa-magnifying-glass text-xs text-white/70"></i>
             <input
               type="text"
               placeholder="Rechercher une boisson, un snack, un dessert..."
-              class="flex-1 bg-transparent text-white placeholder-white/60 outline-none text-sm"
+              class="flex-1 bg-transparent text-white placeholder-white/60 outline-none text-[0.82rem]"
               id="search-input"
               autocomplete="off"
               autocorrect="off"
@@ -233,7 +233,7 @@ function createTopBarMarkup(categories, totalItems) {
           </div>
         </div>
       </div>
-      <div class="category-tabs px-4 pb-4 sm:px-5" data-reveal>
+      <div class="category-tabs px-4 pb-3 sm:px-5" data-reveal>
         ${tabs}
       </div>
     </div>
