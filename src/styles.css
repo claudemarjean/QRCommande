@@ -761,53 +761,81 @@ input {
 }
 
 .bottom-nav-shell {
-  gap: 0.15rem;
+  gap: 0.08rem;
 }
 
 .bottom-nav-item {
   position: relative;
-  min-width: 4.3rem;
-  min-height: 4.15rem;
+  min-width: 4rem;
+  min-height: 3.85rem;
   color: #596172;
-  border-radius: 1.25rem;
+  border-radius: 1.1rem;
   transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.bottom-nav-item::after {
+  content: '';
+  position: absolute;
+  top: 0.42rem;
+  left: 50%;
+  width: 1.4rem;
+  height: 0.18rem;
+  border-radius: 999px;
+  background: transparent;
+  transform: translateX(-50%);
+  transition: background 0.2s ease, width 0.2s ease;
 }
 
 .bottom-nav-icon-shell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.45rem;
-  height: 2.45rem;
-  border-radius: 0.95rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.75rem;
   border: 1px solid rgba(68, 38, 63, 0.08);
-  background: rgba(68, 38, 63, 0.1);
+  background: rgba(68, 38, 63, 0.08);
   color: #596172;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .bottom-nav-icon-shell svg {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.08rem;
+  height: 1.08rem;
   display: block;
   fill: currentColor;
 }
 
 .bottom-nav-label {
+  font-size: 0.68rem;
+  line-height: 1;
   letter-spacing: -0.01em;
 }
 
 .bottom-nav-item.active {
   color: var(--plum);
   transform: translateY(-1px);
-  background: rgba(68, 38, 63, 0.04);
+  background: linear-gradient(180deg, rgba(68, 38, 63, 0.06), rgba(68, 38, 63, 0.02));
+}
+
+.bottom-nav-item.active::after {
+  width: 1.65rem;
+  background: linear-gradient(135deg, #f1c16c, #d59a3d);
 }
 
 .bottom-nav-item.active .bottom-nav-icon-shell {
   background: linear-gradient(135deg, rgba(68, 38, 63, 0.96), rgba(143, 75, 74, 0.92));
   color: white;
   box-shadow: 0 10px 22px rgba(68, 38, 63, 0.2);
+}
+
+.bottom-nav-item.active .bottom-nav-label {
+  color: #341d30;
+}
+
+.bottom-nav-item:not(.active):not(:disabled):hover .bottom-nav-icon-shell {
+  background: rgba(68, 38, 63, 0.12);
 }
 
 .bottom-nav-item:disabled .bottom-nav-icon-shell {
