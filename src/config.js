@@ -32,6 +32,7 @@ export const appConfig = Object.freeze({
   supabaseUrl: isValidSupabaseUrl(supabaseUrl) ? supabaseUrl : '',
   supabaseAnonKey,
   cartStorageKey: 'qrcommande-cart',
+  ordersStorageKey: 'qrcommande-orders',
   maxCartEntries: 50,
   maxCartItemQuantity: 20,
   maxTextLength: 120

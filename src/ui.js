@@ -598,6 +598,8 @@ export function renderCart(screenRoot, cartItems) {
   const options = arguments[2] || {};
   const errorMessage = options.errorMessage ? escapeHtml(options.errorMessage) : '';
   const isSubmitting = Boolean(options.isSubmitting);
+  const tableLabel = escapeHtml(options.tableLabel || '');
+  const hasTableLabel = Boolean(String(options.tableLabel || '').trim());
 
   screenRoot.innerHTML = `
     ${createCartHeaderMarkup(cartItems)}
@@ -627,23 +629,41 @@ export function renderCart(screenRoot, cartItems) {
                     <h2 class="cart-summary-title">article${cartCount > 1 ? 's' : ''} dans le panier</h2>
                   </div>
                 </div>
-                <div class="cart-summary-actions">
-                  <button type="button" data-back-to-menu class="cart-secondary-btn" ${isSubmitting ? 'disabled' : ''}>
-                    <i class="fa-solid fa-plus"></i>
-                    Ajouter encore
-                  </button>
-                  <button type="button" data-checkout class="cart-primary-btn ${isSubmitting ? 'is-loading' : ''}" ${isSubmitting ? 'disabled aria-busy="true"' : ''}>
-                    <span class="cart-primary-btn-content ${isSubmitting ? 'opacity-0' : ''}">
-                      <i class="fa-solid fa-bag-shopping"></i>
-                      Valider la commande
-                    </span>
-                    ${isSubmitting
-                      ? `
-                        <span class="cart-btn-loader" aria-hidden="true"></span>
-                        <span class="cart-btn-loading-copy">Envoi...</span>
-                      `
-                      : ''}
-                  </button>
+                <div class="cart-summary-panel">
+                  <label class="cart-service-field">
+                    <span class="cart-service-label">Repère de service</span>
+                    <div class="cart-service-input-shell ${hasTableLabel ? 'is-complete' : ''}">
+                      <i class="fa-solid fa-location-dot cart-service-input-icon" aria-hidden="true"></i>
+                      <input
+                        type="text"
+                        value="${tableLabel}"
+                        data-table-label-input
+                        class="cart-service-input"
+                        placeholder="Ex. Table 12, ..."
+                        maxlength="120"
+                        ${isSubmitting ? 'disabled' : ''}
+                      />
+                    </div>
+                  </label>
+                  <div class="cart-summary-actions">
+                    <p class="cart-service-status ${hasTableLabel ? 'is-ready' : ''}" data-checkout-status>
+                      ${hasTableLabel ? 'Repère prêt pour l’envoi.' : 'Renseignez un repère pour activer la validation.'}
+                    </p>
+                    <div class="cart-summary-buttons">
+                      <button type="button" data-checkout class="cart-primary-btn ${isSubmitting ? 'is-loading' : ''}" ${isSubmitting || !hasTableLabel ? 'disabled' : ''} ${isSubmitting ? 'aria-busy="true"' : ''}>
+                        <span class="cart-primary-btn-content ${isSubmitting ? 'opacity-0' : ''}">
+                          <i class="fa-solid fa-bag-shopping"></i>
+                          Valider la commande
+                        </span>
+                        ${isSubmitting
+                          ? `
+                            <span class="cart-btn-loader" aria-hidden="true"></span>
+                            <span class="cart-btn-loading-copy">Envoi...</span>
+                          `
+                          : ''}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="space-y-3">
@@ -676,6 +696,7 @@ export function renderCart(screenRoot, cartItems) {
 
 export function renderOrderConfirmation(screenRoot, order) {
   const orderNumber = escapeHtml(order?.orderNumber || '');
+  const tableLabel = escapeHtml(order?.tableLabel || '');
   const orderTime = escapeHtml(formatOrderTime(order?.createdAt));
 
   screenRoot.innerHTML = `
@@ -684,7 +705,12 @@ export function renderOrderConfirmation(screenRoot, order) {
         <section class="confirmation-card" data-confirmation-card>
           <div class="confirmation-aura"></div>
           <div class="confirmation-check" data-confirmation-check>
-            <i class="fa-solid fa-check"></i>
+            <span class="confirmation-check-ring" aria-hidden="true"></span>
+            <span class="confirmation-check-core" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="confirmation-check-svg" aria-hidden="true" focusable="false">
+                <path d="M6 12.5L10.1 16.6L18.2 8.4"></path>
+              </svg>
+            </span>
           </div>
           <span class="confirmation-chip" data-confirmation-reveal>Commande confirmée</span>
           <div class="confirmation-copy-block" data-confirmation-reveal>
@@ -695,6 +721,10 @@ export function renderOrderConfirmation(screenRoot, order) {
             <div class="confirmation-detail-card">
               <span class="confirmation-detail-label">Numéro de commande</span>
               <strong class="confirmation-detail-value">${orderNumber}</strong>
+            </div>
+            <div class="confirmation-detail-card">
+              <span class="confirmation-detail-label">Repere</span>
+              <strong class="confirmation-detail-value">${tableLabel}</strong>
             </div>
             <div class="confirmation-detail-card">
               <span class="confirmation-detail-label">Heure</span>
@@ -755,6 +785,7 @@ export function renderOrders(screenRoot, orders) {
                     </div>
                     <span class="order-status-chip">${escapeHtml(getOrderStatusLabel(order.status))}</span>
                   </div>
+                  <p class="order-card-reference">${escapeHtml(order.tableLabel || '')}</p>
                   <div class="order-card-meta">
                     <span>${escapeHtml(formatOrderTime(order.createdAt))}</span>
                     <span>${escapeHtml(new Date(order.createdAt || Date.now()).toLocaleDateString('fr-FR'))}</span>
@@ -795,7 +826,7 @@ export function bindMenuActions(screenRoot, onAddToCart) {
   });
 }
 
-export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout, onNewOrder }) {
+export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout, onNewOrder, onTableLabelChange }) {
   if (screenRoot.__cartClickHandler) {
     screenRoot.removeEventListener('click', screenRoot.__cartClickHandler);
   }
@@ -843,6 +874,39 @@ export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClea
 
   screenRoot.__cartClickHandler = cartClickHandler;
   screenRoot.addEventListener('click', cartClickHandler);
+
+  const tableLabelInput = screenRoot.querySelector('[data-table-label-input]');
+  const checkoutButton = screenRoot.querySelector('[data-checkout]');
+  const checkoutStatus = screenRoot.querySelector('[data-checkout-status]');
+  const inputShell = screenRoot.querySelector('.cart-service-input-shell');
+
+  const syncCheckoutAvailability = (value) => {
+    const hasValue = Boolean(String(value || '').trim());
+
+    if (checkoutButton && !checkoutButton.classList.contains('is-loading')) {
+      checkoutButton.disabled = !hasValue;
+    }
+
+    if (checkoutStatus) {
+      checkoutStatus.textContent = hasValue
+        ? 'Repère prêt pour l’envoi.'
+        : 'Renseignez un repère pour activer la validation.';
+      checkoutStatus.classList.toggle('is-ready', hasValue);
+    }
+
+    if (inputShell) {
+      inputShell.classList.toggle('is-complete', hasValue);
+    }
+  };
+
+  if (tableLabelInput && typeof onTableLabelChange === 'function') {
+    syncCheckoutAvailability(tableLabelInput.value);
+    tableLabelInput.addEventListener('input', (event) => {
+      const nextValue = event.target.value;
+      syncCheckoutAvailability(nextValue);
+      onTableLabelChange(nextValue);
+    });
+  }
 }
 
 export function bindOrdersActions(screenRoot, { onBackToMenu }) {

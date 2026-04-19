@@ -79,6 +79,7 @@ function normalizeOrderRecord(record, fallbackDate) {
   return {
     id: record?.id ?? null,
     orderNumber: String(record?.order_number || ''),
+    tableLabel: normalizeText(record?.table_label, ''),
     status: String(record?.status || 'pending'),
     createdAt
   };
@@ -92,38 +93,65 @@ function isRowLevelSecurityError(error) {
   return /row-level security policy/i.test(error?.message || '');
 }
 
+function isDuplicateOrderNumberError(error) {
+  const message = String(error?.message || '');
+  return error?.code === '23505' && /order_number/i.test(message)
+    || /duplicate key value violates unique constraint/i.test(message) && /order_number/i.test(message);
+}
+
 function formatSupabaseWriteError(error) {
   if (isRowLevelSecurityError(error)) {
     return new Error('Insertion bloquée par Supabase (RLS) sur les commandes. Ajoutez une policy INSERT pour les roles anon/authenticated sur orders et order_items.');
   }
 
+  if (isDuplicateOrderNumberError(error)) {
+    return new Error('Le numero de commande genere existe deja. Activez une contrainte UNIQUE sur orders.order_number et une generation serveur, puis reessayez.');
+  }
+
   return new Error(error?.message || 'Impossible de créer la commande.');
 }
 
-async function insertOrderRecord() {
-  let response = await supabase
+async function insertOrderRecordAttempt(tableLabel, selectColumns) {
+  return supabase
     .from('orders')
     .insert({
-      status: 'pending'
+      status: 'pending',
+      table_label: tableLabel
     })
-    .select('id, order_number, status, created_at')
+    .select(selectColumns)
     .single();
+}
 
-  if (response.error && isMissingColumnError(response.error, 'created_at')) {
-    response = await supabase
-      .from('orders')
-      .insert({
-        status: 'pending'
-      })
-      .select('id, order_number, status, created_at')
-      .single();
+async function insertOrderRecord(tableLabel) {
+  const normalizedTableLabel = normalizeText(tableLabel, '');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let response = await insertOrderRecordAttempt(
+      normalizedTableLabel,
+      'id, order_number, table_label, status, created_at'
+    );
+
+    if (response.error && isMissingColumnError(response.error, 'created_at')) {
+      response = await insertOrderRecordAttempt(
+        normalizedTableLabel,
+        'id, order_number, table_label, status'
+      );
+    }
+
+    if (!response.error) {
+      if (response.data?.order_number === undefined || response.data?.order_number === null || response.data?.order_number === '') {
+        throw new Error('La base n\'a pas retourne de numero de commande. Configurez une generation automatique sur orders.order_number.');
+      }
+
+      return response.data;
+    }
+
+    if (!isDuplicateOrderNumberError(response.error)) {
+      throw formatSupabaseWriteError(response.error);
+    }
   }
 
-  if (response.error) {
-    throw formatSupabaseWriteError(response.error);
-  }
-
-  return response.data;
+  throw new Error('Impossible de garantir un numero de commande unique apres plusieurs tentatives. Verifiez la contrainte UNIQUE sur orders.order_number.');
 }
 
 async function insertOrderItems(orderId, cartItems) {
@@ -142,13 +170,18 @@ async function insertOrderItems(orderId, cartItems) {
   }
 }
 
-async function createDemoOrder(cartItems) {
+async function createDemoOrder(cartItems, tableLabel) {
   await new Promise((resolve) => window.setTimeout(resolve, 900));
+
+  const randomToken = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()
+    : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
 
   return normalizeOrderRecord(
     {
       id: `demo-${Date.now()}`,
-      order_number: `${Math.floor(Date.now() / 1000)}`,
+      order_number: `DEMO-${randomToken}`,
+      table_label: normalizeText(tableLabel, ''),
       status: 'pending',
       created_at: new Date().toISOString()
     },
@@ -156,21 +189,25 @@ async function createDemoOrder(cartItems) {
   );
 }
 
-export async function createOrder(cartItems) {
+export async function createOrder(cartItems, tableLabel) {
   if (!Array.isArray(cartItems) || cartItems.length === 0) {
     throw new Error('Votre panier est vide. Ajoutez au moins un article avant de valider.');
   }
 
+  if (!normalizeText(tableLabel, '')) {
+    throw new Error('Indiquez votre numero de table ou un repere dans l\'evenement avant de valider.');
+  }
+
   if (!supabase) {
     if (appConfig.useDemoData) {
-      return createDemoOrder(cartItems);
+      return createDemoOrder(cartItems, tableLabel);
     }
 
     throw new Error('Erreur de configuration E_CFG_002. Contactez l\'administrateur.');
   }
 
   const createdAt = new Date().toISOString();
-  const orderRow = await insertOrderRecord();
+  const orderRow = await insertOrderRecord(tableLabel);
   const normalizedOrder = normalizeOrderRecord(orderRow, createdAt);
   await insertOrderItems(normalizedOrder.id, cartItems);
   return normalizedOrder;

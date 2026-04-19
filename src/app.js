@@ -64,6 +64,7 @@ async function bootstrap() {
     checkout: {
       isSubmitting: false,
       errorMessage: '',
+      tableLabel: '',
       lastOrder: null
     }
   };
@@ -79,7 +80,8 @@ async function bootstrap() {
     if (state.currentView === 'cart') {
       renderCart(screenRoot, state.cart, {
         isSubmitting: state.checkout.isSubmitting,
-        errorMessage: state.checkout.errorMessage
+        errorMessage: state.checkout.errorMessage,
+        tableLabel: state.checkout.tableLabel
       });
       bindCartActions(screenRoot, {
         onUpdateQuantity: (articleId, action) => {
@@ -133,6 +135,14 @@ async function bootstrap() {
           renderCurrentView();
           showToast(toastRoot, 'Panier vidé.', 'info');
         },
+        onTableLabelChange: (value) => {
+          state.checkout.tableLabel = value;
+
+          if (state.checkout.errorMessage) {
+            state.checkout.errorMessage = '';
+            renderCurrentView();
+          }
+        },
         onCheckout: async () => {
           if (state.checkout.isSubmitting) {
             return;
@@ -145,15 +155,23 @@ async function bootstrap() {
             return;
           }
 
+          if (!String(state.checkout.tableLabel || '').trim()) {
+            state.checkout.errorMessage = 'Renseignez votre numero de table ou un repere dans l\'evenement pour que le service vous retrouve.';
+            renderCurrentView();
+            showToast(toastRoot, state.checkout.errorMessage, 'error');
+            return;
+          }
+
           state.checkout.isSubmitting = true;
           state.checkout.errorMessage = '';
           renderCurrentView();
 
           try {
-            const order = await createOrder(state.cart);
+            const order = await createOrder(state.cart, state.checkout.tableLabel);
             state.cart = [];
             state.orders = [order, ...state.orders.filter((entry) => entry.id !== order.id)].slice(0, 10);
             state.checkout.isSubmitting = false;
+            state.checkout.tableLabel = '';
             state.checkout.lastOrder = order;
             state.currentView = 'confirmation';
             persistCart(state.cart);
@@ -169,6 +187,7 @@ async function bootstrap() {
         },
         onNewOrder: () => {
           state.checkout.errorMessage = '';
+          state.checkout.tableLabel = '';
           state.checkout.lastOrder = null;
           state.currentView = 'menu';
           persistCart(state.cart);
@@ -185,6 +204,7 @@ async function bootstrap() {
         onBackToMenu: () => {
           state.currentView = 'menu';
           state.checkout.errorMessage = '';
+          state.checkout.tableLabel = '';
           state.checkout.lastOrder = null;
           renderCurrentView();
         },
@@ -193,6 +213,7 @@ async function bootstrap() {
         onCheckout: () => {},
         onNewOrder: () => {
           state.checkout.errorMessage = '';
+          state.checkout.tableLabel = '';
           state.checkout.lastOrder = null;
           state.currentView = 'menu';
           renderCurrentView();
