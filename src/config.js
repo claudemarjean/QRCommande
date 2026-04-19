@@ -32,6 +32,7 @@ export const appConfig = Object.freeze({
   useDemoData: parseBoolean(import.meta.env.VITE_USE_DEMO_DATA, false),
   supabaseUrl: isValidSupabaseUrl(supabaseUrl) ? supabaseUrl : '',
   supabaseAnonKey,
+  adminAuthStorageKey: 'qrcommande-admin-auth',
   defaultOrderPendingStatusId,
   defaultOrderPendingStatusCode: 'pending',
   defaultOrderPendingStatusLabel: 'En attente',

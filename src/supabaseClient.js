@@ -13,9 +13,10 @@ const demoArticles = [
 export const supabase = appConfig.supabaseUrl && appConfig.supabaseAnonKey
   ? createClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey, {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        storageKey: appConfig.adminAuthStorageKey
       },
       global: {
         headers: {
@@ -32,6 +33,140 @@ const fallbackPendingStatus = Object.freeze({
   code: appConfig.defaultOrderPendingStatusCode,
   label: appConfig.defaultOrderPendingStatusLabel
 });
+
+function normalizeAdminRole(value) {
+  return String(value || 'admin')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+}
+
+function normalizeAdminProfile(record, user) {
+  const email = normalizeLabel(record?.email || user?.email || '', '');
+
+  return {
+    userId: String(record?.user_id || user?.id || ''),
+    email,
+    displayName: normalizeLabel(record?.display_name, email || 'Administrateur'),
+    role: normalizeAdminRole(record?.role),
+    isActive: Boolean(record?.is_active ?? true)
+  };
+}
+
+function isAdminDirectoryMissingError(error) {
+  const message = String(error?.message || '');
+  return error?.code === '42P01' || /admin_users/i.test(message) && /does not exist|relation/i.test(message);
+}
+
+function formatAdminDirectoryError(error) {
+  if (isAdminDirectoryMissingError(error)) {
+    return new Error('Configuration admin incomplète. Créez la table public.admin_users et ses policies avant d’utiliser la connexion admin.');
+  }
+
+  if (isRowLevelSecurityError(error)) {
+    return new Error('Lecture admin bloquée par Supabase (RLS). Vérifiez les policies SELECT sur public.admin_users.');
+  }
+
+  return new Error(error?.message || 'Impossible de vérifier les droits administrateur.');
+}
+
+function formatAdminAuthError(error) {
+  const message = String(error?.message || '');
+
+  if (/invalid login credentials|email not confirmed|invalid_credentials/i.test(message)) {
+    return new Error('Identifiants invalides ou accès refusé.');
+  }
+
+  if (/Email logins are disabled/i.test(message)) {
+    return new Error('La connexion email/mot de passe est désactivée dans Supabase Auth.');
+  }
+
+  return new Error('Connexion admin impossible pour le moment.');
+}
+
+async function fetchOwnAdminProfile(userId) {
+  const { data, error } = await supabase
+    .from('admin_users')
+    .select('user_id, email, display_name, role, is_active')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw formatAdminDirectoryError(error);
+  }
+
+  return data || null;
+}
+
+async function resolveAdminContext(session, { signOutOnFailure = false } = {}) {
+  if (!session?.user || !supabase) {
+    return { session: null, admin: null };
+  }
+
+  const adminRecord = await fetchOwnAdminProfile(session.user.id);
+
+  if (!adminRecord || adminRecord.is_active === false) {
+    if (signOutOnFailure) {
+      await supabase.auth.signOut();
+    }
+
+    return { session: null, admin: null };
+  }
+
+  return {
+    session,
+    admin: normalizeAdminProfile(adminRecord, session.user)
+  };
+}
+
+export async function restoreAdminSession() {
+  if (!supabase) {
+    return { session: null, admin: null };
+  }
+
+  const { data, error } = await supabase.auth.getSession();
+
+  if (error) {
+    throw new Error('Impossible de restaurer la session administrateur.');
+  }
+
+  if (!data?.session) {
+    return { session: null, admin: null };
+  }
+
+  return resolveAdminContext(data.session, { signOutOnFailure: true });
+}
+
+export async function signInAdmin(email, password) {
+  if (!supabase) {
+    throw new Error('Erreur de configuration E_CFG_003. Contactez l\'administrateur.');
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: String(email || '').trim(),
+    password: String(password || '')
+  });
+
+  if (error) {
+    throw formatAdminAuthError(error);
+  }
+
+  const adminContext = await resolveAdminContext(data?.session || null, { signOutOnFailure: true });
+
+  if (!adminContext.admin) {
+    throw new Error('Accès refusé. Cet espace est réservé aux administrateurs.');
+  }
+
+  return adminContext;
+}
+
+export async function signOutAdmin() {
+  if (!supabase) {
+    return;
+  }
+
+  await supabase.auth.signOut();
+}
 
 function normalizeText(value, fallback = 'Autres') {
   const normalizedValue = String(value ?? fallback)

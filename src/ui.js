@@ -951,6 +951,62 @@ export function renderAdminLogin(screenRoot, accountState = {}) {
   animateAdminAccess(screenRoot);
 }
 
+export function renderAdminTestScreen(screenRoot, adminProfile = {}) {
+  const displayName = escapeHtml(adminProfile?.displayName || 'Administrateur');
+  const email = escapeHtml(adminProfile?.email || '');
+  const role = escapeHtml(adminProfile?.role || 'admin');
+
+  screenRoot.innerHTML = `
+    <div class="main-content page-surface admin-screen">
+      <div class="px-4 pb-8 pt-5 sm:px-5">
+        <section class="admin-panel" data-admin-panel>
+          <div class="admin-panel-orb admin-panel-orb-left"></div>
+          <div class="admin-panel-orb admin-panel-orb-right"></div>
+          <div class="admin-panel-head">
+            <div class="admin-signal" data-admin-signal>
+              ${renderAccountBadgeIcon()}
+            </div>
+            <div class="admin-copy-block" data-admin-reveal>
+              <span class="admin-kicker">Session active</span>
+              <h1 class="admin-title">Page de test admin</h1>
+              <p class="admin-copy">Connexion validée. La suite pourra être développée ici.</p>
+            </div>
+            <div class="admin-note" data-admin-reveal>
+              <strong>${displayName}</strong>
+              <p>${email}</p>
+            </div>
+          </div>
+
+          <div class="admin-grid admin-grid-dashboard">
+            <article class="admin-info-card" data-admin-reveal>
+              <span class="admin-info-pill">Test</span>
+              <h2 class="admin-info-title">Zone protégée opérationnelle</h2>
+              <p class="admin-info-copy">L’authentification admin fonctionne. Vous pouvez maintenant développer le dashboard métier.</p>
+            </article>
+
+            <article class="admin-login-card admin-console-card" data-admin-reveal>
+              <div class="admin-console-row">
+                <span class="admin-console-label">Rôle</span>
+                <strong class="admin-console-value">${role}</strong>
+              </div>
+              <div class="admin-console-row">
+                <span class="admin-console-label">Compte</span>
+                <strong class="admin-console-value">${email}</strong>
+              </div>
+              <button type="button" class="admin-login-button" data-admin-signout>
+                <span>Se déconnecter</span>
+                <i class="fa-solid fa-right-from-bracket"></i>
+              </button>
+            </article>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+
+  animateAdminAccess(screenRoot);
+}
+
 function renderOrdersListMarkup(orders) {
   const safeOrders = Array.isArray(orders) ? orders : [];
 
@@ -1188,6 +1244,16 @@ export function bindAdminLoginActions(screenRoot, { onEmailChange, onPasswordCha
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       onSubmit();
+    });
+  }
+}
+
+export function bindAdminTestActions(screenRoot, { onSignOut }) {
+  const signOutButton = screenRoot.querySelector('[data-admin-signout]');
+
+  if (signOutButton && typeof onSignOut === 'function') {
+    signOutButton.addEventListener('click', () => {
+      onSignOut();
     });
   }
 }

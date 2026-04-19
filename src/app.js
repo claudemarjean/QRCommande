@@ -2,15 +2,17 @@ import './styles.css';
 
 import { appConfig } from './config.js';
 import { addToCart, loadCart, persistCart, removeFromCart, updateCartItemQuantity } from './cart.js';
-import { createOrder, fetchArticles, reconcileStoredOrders } from './supabaseClient.js';
+import { createOrder, fetchArticles, reconcileStoredOrders, restoreAdminSession, signInAdmin, signOutAdmin } from './supabaseClient.js';
 import {
   bindAdminLoginActions,
+  bindAdminTestActions,
   bindBottomNavigation,
   bindCartActions,
   bindMenuActions,
   bindOrdersActions,
   mountBaseLayout,
   renderAdminLogin,
+  renderAdminTestScreen,
   renderCart,
   renderErrorState,
   renderInactiveState,
@@ -44,6 +46,10 @@ function createOrdersSnapshot(orders) {
         : []
     }))
   );
+}
+
+function getNavigationView(currentView) {
+  return currentView === 'admin-test' ? 'account' : currentView;
 }
 
 function sortArticles(articles) {
@@ -126,7 +132,8 @@ async function bootstrap() {
       password: '',
       errorMessage: '',
       isSubmitting: false,
-      showPassword: false
+      showPassword: false,
+      adminProfile: null
     },
     checkout: {
       isSubmitting: false,
@@ -222,9 +229,25 @@ async function bootstrap() {
     }
   }
 
+  async function openAccountView() {
+    state.currentView = 'account';
+    state.account.errorMessage = '';
+
+    try {
+      const adminContext = await restoreAdminSession();
+      state.account.adminProfile = adminContext.admin;
+      state.currentView = adminContext.admin ? 'admin-test' : 'account';
+    } catch (error) {
+      state.account.adminProfile = null;
+      state.account.errorMessage = error.message || 'Impossible de verifier la session administrateur.';
+    }
+
+    renderCurrentView();
+  }
+
   function syncCartUi() {
     updateCartBadge(appRoot, state.cart);
-    updateBottomNavigation(appRoot, state.currentView);
+    updateBottomNavigation(appRoot, getNavigationView(state.currentView));
   }
 
   function renderCurrentView() {
@@ -439,12 +462,39 @@ async function bootstrap() {
           state.account.errorMessage = '';
           renderCurrentView();
 
-          await new Promise((resolve) => window.setTimeout(resolve, 700));
+          try {
+            const adminContext = await signInAdmin(email, password);
+            state.account.adminProfile = adminContext.admin;
+            state.account.email = adminContext.admin?.email || email;
+            state.account.password = '';
+            state.account.isSubmitting = false;
+            state.account.errorMessage = '';
+            state.currentView = 'admin-test';
+            renderCurrentView();
+            showToast(toastRoot, 'Connexion admin réussie.', 'success');
+          } catch (error) {
+            state.account.adminProfile = null;
+            state.account.password = '';
+            state.account.isSubmitting = false;
+            state.account.errorMessage = error.message || 'Connexion admin impossible.';
+            renderCurrentView();
+          }
+        }
+      });
+      return;
+    }
 
-          state.account.isSubmitting = false;
-          state.account.errorMessage = 'Connexion admin non branchée dans cette version.';
+    if (state.currentView === 'admin-test') {
+      renderAdminTestScreen(screenRoot, state.account.adminProfile);
+      bindAdminTestActions(screenRoot, {
+        onSignOut: async () => {
+          await signOutAdmin();
+          state.account.adminProfile = null;
+          state.account.password = '';
+          state.account.errorMessage = '';
+          state.currentView = 'account';
           renderCurrentView();
-          showToast(toastRoot, 'Connexion admin non disponible pour le moment.', 'info');
+          showToast(toastRoot, 'Session admin fermée.', 'info');
         }
       });
       return;
@@ -466,6 +516,11 @@ async function bootstrap() {
       return;
     }
 
+    if (targetView === 'account') {
+      void openAccountView();
+      return;
+    }
+
     state.currentView = targetView;
     renderCurrentView();
   });
@@ -482,6 +537,16 @@ async function bootstrap() {
 
     const articles = await fetchArticles();
     state.articles = sortArticles(articles);
+
+    try {
+      const adminContext = await restoreAdminSession();
+      state.account.adminProfile = adminContext.admin;
+      if (adminContext.admin?.email) {
+        state.account.email = adminContext.admin.email;
+      }
+    } catch {
+      state.account.adminProfile = null;
+    }
 
     if (state.orders.length) {
       try {
