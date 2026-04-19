@@ -41,6 +41,24 @@ function getOrderStatusLabel(order) {
   return labels[statusCode] || 'En attente';
 }
 
+function getOrderStatusVariant(order) {
+  const statusCode = String(order?.statusCode || order?.status || '').toLowerCase();
+
+  if (/(served|delivered|completed|terminee|termine)/.test(statusCode)) {
+    return 'served';
+  }
+
+  if (/(preparing|preparation|processing|in_progress|encours)/.test(statusCode)) {
+    return 'preparing';
+  }
+
+  if (/(cancelled|canceled|rejected|refused|annulee|annule)/.test(statusCode)) {
+    return 'cancelled';
+  }
+
+  return 'pending';
+}
+
 function normalizeText(value) {
   return String(value || '')
     .normalize('NFD')
@@ -869,7 +887,7 @@ export function renderOrders(screenRoot, orders) {
                       <p class="order-card-kicker">Commande</p>
                       <h3 class="order-card-title">#${escapeHtml(order.orderNumber || '')}</h3>
                     </div>
-                    <span class="order-status-chip">${escapeHtml(getOrderStatusLabel(order))}</span>
+                    <span class="order-status-chip status-${escapeHtml(getOrderStatusVariant(order))}">${escapeHtml(getOrderStatusLabel(order))}</span>
                   </div>
                   <p class="order-card-reference">${escapeHtml(order.tableLabel || '')}</p>
                   ${renderOrderItemsSummary(order)}

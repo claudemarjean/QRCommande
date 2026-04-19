@@ -136,16 +136,35 @@ export async function fetchArticles() {
     : [];
 }
 
-function normalizeOrderRecord(record, fallbackDate) {
+function getOrderStatusId(record) {
+  if (record?.statusId) {
+    return String(record.statusId);
+  }
+
+  if (isUuidLike(record?.status)) {
+    return String(record.status);
+  }
+
+  return '';
+}
+
+function getOrderNumber(record) {
+  const orderNumber = record?.orderNumber ?? record?.order_number ?? '';
+  return String(orderNumber || '').trim();
+}
+
+function normalizeOrderRecord(record, fallbackDate, options = {}) {
   const createdAt = record?.created_at || fallbackDate;
-  const relationStatus = record?.status_details;
-  const legacyStatusCode = !relationStatus && typeof record?.status === 'string' && !isUuidLike(record.status)
+  const statusLookup = options?.statusById instanceof Map ? options.statusById : new Map();
+  const statusId = getOrderStatusId(record);
+  const lookupStatus = statusLookup.get(statusId) || null;
+  const legacyStatusCode = typeof record?.status === 'string' && !isUuidLike(record.status)
     ? normalizeStatusCode(record.status, 'pending')
     : normalizeStatusCode(record?.statusCode || '', 'pending');
-  const statusRecord = relationStatus
-    ? normalizeStatusRecord(relationStatus)
+  const statusRecord = lookupStatus
+    ? normalizeStatusRecord(lookupStatus)
     : {
-        id: record?.statusId ? String(record.statusId) : (isUuidLike(record?.status) ? String(record.status) : ''),
+        id: statusId,
         code: legacyStatusCode,
         label: normalizeLabel(record?.statusLabel, getLegacyOrderStatusLabel(legacyStatusCode))
       };
@@ -159,6 +178,29 @@ function normalizeOrderRecord(record, fallbackDate) {
     statusCode: statusRecord.code,
     statusLabel: statusRecord.label,
     createdAt
+  };
+}
+
+function normalizeOrderItemsSnapshot(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((item) => ({
+      name: normalizeText(item?.name, '').slice(0, appConfig.maxTextLength),
+      quantity: Math.max(1, Number(item?.quantity) || 1)
+    }))
+    .filter((item) => item.name);
+}
+
+function normalizeStoredOrder(record) {
+  const normalizedOrder = normalizeOrderRecord(record, record?.createdAt || new Date().toISOString());
+
+  return {
+    ...normalizedOrder,
+    orderNumber: getOrderNumber(record) || normalizedOrder.orderNumber,
+    items: normalizeOrderItemsSnapshot(record?.items)
   };
 }
 
@@ -272,6 +314,257 @@ async function insertOrderRecord(tableLabel) {
   }
 
   throw new Error('Impossible de garantir un numero de commande unique apres plusieurs tentatives. Verifiez la contrainte UNIQUE sur orders.order_number.');
+}
+
+async function fetchOrdersByIds(orderIds) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, order_number, table_label, created_at, status')
+    .in('id', orderIds);
+
+  if (error) {
+    throw new Error(error.message || 'Impossible de synchroniser les commandes.');
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchOrdersByOrderNumbers(orderNumbers) {
+  if (!orderNumbers.length) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, order_number, table_label, created_at, status')
+    .in('order_number', orderNumbers);
+
+  if (error) {
+    throw new Error(error.message || 'Impossible de synchroniser les commandes par numero.');
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchOrderStatusesByIds(statusIds) {
+  if (!statusIds.length) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from('order_statuses')
+    .select('id, code, label')
+    .in('id', statusIds);
+
+  if (error) {
+    throw new Error(error.message || 'Impossible de synchroniser les statuts des commandes.');
+  }
+
+  return new Map(
+    (Array.isArray(data) ? data : [])
+      .map((status) => normalizeStatusRecord(status))
+      .filter((status) => status.id)
+      .map((status) => [status.id, status])
+  );
+}
+
+async function buildStatusLookup(statusIds) {
+  const directStatuses = await fetchOrderStatusesByIds(statusIds);
+
+  if (directStatuses.size === statusIds.length) {
+    return directStatuses;
+  }
+
+  const activeStatuses = await fetchActiveOrderStatuses();
+  const mergedStatuses = new Map(directStatuses);
+
+  activeStatuses.forEach((status) => {
+    if (!mergedStatuses.has(status.id)) {
+      mergedStatuses.set(status.id, status);
+    }
+  });
+
+  return mergedStatuses;
+}
+
+function findMissingStatusIds(statusIds, statusById) {
+  return statusIds.filter((statusId) => statusId && !statusById.has(statusId));
+}
+
+async function fetchOrderItemsByOrderIds(orderIds) {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select('order_id, article_id, quantity')
+    .in('order_id', orderIds);
+
+  if (error) {
+    throw new Error(error.message || 'Impossible de synchroniser les articles des commandes.');
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchArticleNamesByIds(articleIds) {
+  if (!articleIds.length) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from('articles')
+    .select('id, name')
+    .in('id', articleIds);
+
+  if (error) {
+    throw new Error(error.message || 'Impossible de synchroniser les noms des articles.');
+  }
+
+  return new Map(
+    (Array.isArray(data) ? data : [])
+      .filter((record) => record?.id !== undefined && record?.id !== null)
+      .map((record) => [String(record.id), normalizeText(record.name, 'Article')])
+  );
+}
+
+async function buildOrderItemsSnapshot(orderIds) {
+  const orderItems = await fetchOrderItemsByOrderIds(orderIds);
+  const articleIds = [...new Set(orderItems
+    .map((item) => item?.article_id)
+    .filter((articleId) => articleId !== undefined && articleId !== null)
+    .map((articleId) => String(articleId)))];
+  const articleNamesById = await fetchArticleNamesByIds(articleIds);
+  const itemsByOrderId = new Map();
+
+  orderItems.forEach((item) => {
+    const orderId = String(item?.order_id || '');
+    if (!orderId) {
+      return;
+    }
+
+    const currentItems = itemsByOrderId.get(orderId) || [];
+    const articleId = String(item?.article_id || '');
+    const articleName = articleNamesById.get(articleId);
+
+    if (!articleName) {
+      return;
+    }
+
+    currentItems.push({
+      name: articleName,
+      quantity: Math.max(1, Number(item?.quantity) || 1)
+    });
+
+    itemsByOrderId.set(orderId, currentItems);
+  });
+
+  return itemsByOrderId;
+}
+
+export async function reconcileStoredOrders(storedOrders) {
+  const normalizedOrders = Array.isArray(storedOrders)
+    ? storedOrders.map(normalizeStoredOrder).filter((order) => order.orderNumber || order.id)
+    : [];
+
+  if (!normalizedOrders.length || !supabase) {
+    return normalizedOrders.slice(0, 10);
+  }
+
+  const persistentOrderIds = [...new Set(normalizedOrders
+    .map((order) => order?.id)
+    .filter((orderId) => orderId !== undefined && orderId !== null)
+    .map((orderId) => String(orderId))
+    .filter((orderId) => orderId && !orderId.startsWith('demo-')))];
+  const orderNumbersWithoutIds = [...new Set(normalizedOrders
+    .filter((order) => !order?.id || String(order.id).startsWith('demo-'))
+    .map((order) => getOrderNumber(order))
+    .filter(Boolean))];
+
+  const fetchedOrders = [
+    ...(persistentOrderIds.length ? await fetchOrdersByIds(persistentOrderIds) : []),
+    ...(orderNumbersWithoutIds.length ? await fetchOrdersByOrderNumbers(orderNumbersWithoutIds) : [])
+  ];
+  const orderRows = [...new Map(fetchedOrders.map((order) => [String(order.id), order])).values()];
+  const ordersById = new Map(orderRows.map((order) => [String(order.id), order]));
+  const ordersByNumber = new Map(orderRows.map((order) => [getOrderNumber(order), order]));
+  const orderStatusIds = [...new Set([
+    ...orderRows.map((order) => getOrderStatusId(order)),
+    ...normalizedOrders.map((order) => getOrderStatusId(order))
+  ].filter(Boolean))];
+  const statusById = await buildStatusLookup(orderStatusIds);
+  const missingStatusIds = findMissingStatusIds(orderStatusIds, statusById);
+
+  if (missingStatusIds.length) {
+    throw new Error('Impossible de resoudre certains statuts de commande depuis order_statuses. Verifiez la policy SELECT/RLS sur order_statuses et la presence des IDs references dans orders.status.');
+  }
+
+  const normalizedFallbackStatuses = new Map(normalizedOrders
+    .map((order) => {
+      const statusId = getOrderStatusId(order);
+
+      if (!statusId) {
+        return null;
+      }
+
+      return [statusId, {
+        id: statusId,
+        code: order.statusCode,
+        label: order.statusLabel
+      }];
+    })
+    .filter(Boolean));
+  const mergedStatusById = new Map([...normalizedFallbackStatuses, ...statusById]);
+  const persistentEntries = normalizedOrders.filter((order) => {
+    const orderId = String(order?.id || '');
+
+    return orderId && !orderId.startsWith('demo-') || getOrderNumber(order);
+  });
+
+  if (!persistentEntries.length) {
+    return normalizedOrders.slice(0, 10);
+  }
+
+  let itemsByOrderId = new Map();
+
+  try {
+    itemsByOrderId = await buildOrderItemsSnapshot([...ordersById.keys()]);
+  } catch {
+    itemsByOrderId = new Map();
+  }
+
+  const syncedPersistentOrders = persistentEntries
+    .flatMap((localOrder) => {
+      const localOrderId = String(localOrder?.id || '');
+      const localOrderNumber = getOrderNumber(localOrder);
+      const remoteOrder = ordersById.get(localOrderId) || ordersByNumber.get(localOrderNumber);
+
+      if (!remoteOrder && localOrderId && !localOrderId.startsWith('demo-')) {
+        return [];
+      }
+
+      const orderSource = remoteOrder || {
+        ...localOrder,
+        order_number: localOrderNumber,
+        table_label: localOrder.tableLabel,
+        created_at: localOrder.createdAt,
+        status: getOrderStatusId(localOrder) || localOrder.statusCode || localOrder.status,
+        statusId: getOrderStatusId(localOrder),
+        statusCode: localOrder.statusCode,
+        statusLabel: localOrder.statusLabel
+      };
+
+      const syncedOrder = normalizeOrderRecord(orderSource, localOrder.createdAt, {
+        statusById: mergedStatusById
+      });
+
+      return [{
+        ...syncedOrder,
+        items: normalizeOrderItemsSnapshot(itemsByOrderId.get(String(remoteOrder?.id || localOrderId)) || localOrder.items)
+      }];
+    });
+
+  const demoOrders = normalizedOrders.filter((order) => String(order?.id || '').startsWith('demo-'));
+
+  return [...syncedPersistentOrders, ...demoOrders]
+    .slice(0, 10);
 }
 
 async function insertOrderItems(orderId, cartItems) {

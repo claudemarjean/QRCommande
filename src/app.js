@@ -2,7 +2,7 @@ import './styles.css';
 
 import { appConfig } from './config.js';
 import { addToCart, loadCart, persistCart, removeFromCart, updateCartItemQuantity } from './cart.js';
-import { createOrder, fetchArticles } from './supabaseClient.js';
+import { createOrder, fetchArticles, reconcileStoredOrders } from './supabaseClient.js';
 import {
   bindBottomNavigation,
   bindCartActions,
@@ -42,10 +42,18 @@ function loadOrders() {
     return Array.isArray(parsedOrders)
       ? parsedOrders.map((order) => ({
           ...order,
-          statusId: order?.statusId ? String(order.statusId) : '',
-          statusCode: String(order?.statusCode || order?.status || 'pending').trim() || 'pending',
+          statusId: order?.statusId
+            ? String(order.statusId)
+            : /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(order?.status || ''))
+              ? String(order.status)
+              : '',
+          statusCode: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(order?.status || ''))
+            ? String(order?.statusCode || 'pending').trim() || 'pending'
+            : String(order?.statusCode || order?.status || 'pending').trim() || 'pending',
           statusLabel: String(order?.statusLabel || '').trim() || 'En attente',
-          status: String(order?.statusCode || order?.status || 'pending').trim() || 'pending',
+          status: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(order?.status || ''))
+            ? String(order?.statusCode || 'pending').trim() || 'pending'
+            : String(order?.statusCode || order?.status || 'pending').trim() || 'pending',
           items: Array.isArray(order?.items)
             ? order.items
                 .map((item) => ({
@@ -85,6 +93,8 @@ async function bootstrap() {
     articles: [],
     cart: loadCart(),
     orders: loadOrders(),
+    ordersSyncPromise: null,
+    ordersSyncInProgress: false,
     checkout: {
       isSubmitting: false,
       errorMessage: '',
@@ -92,6 +102,45 @@ async function bootstrap() {
       lastOrder: null
     }
   };
+
+  async function syncOrdersFromStorageWithDatabase() {
+    if (state.ordersSyncPromise) {
+      return state.ordersSyncPromise;
+    }
+
+    state.orders = loadOrders();
+    state.ordersSyncInProgress = true;
+    if (state.currentView === 'orders') {
+      renderCurrentView();
+    }
+
+    state.ordersSyncPromise = (async () => {
+      const syncedOrders = await reconcileStoredOrders(state.orders);
+      state.orders = syncedOrders;
+      persistOrders(state.orders);
+    })();
+
+    try {
+      await state.ordersSyncPromise;
+    } finally {
+      state.ordersSyncInProgress = false;
+      state.ordersSyncPromise = null;
+    }
+  }
+
+  async function openOrdersView() {
+    state.currentView = 'orders';
+    renderCurrentView();
+
+    try {
+      await syncOrdersFromStorageWithDatabase();
+      if (state.currentView === 'orders') {
+        renderCurrentView();
+      }
+    } catch (error) {
+      showToast(toastRoot, error.message || 'La synchronisation des commandes a echoue.', 'error');
+    }
+  }
 
   function syncCartUi() {
     updateCartBadge(appRoot, state.cart);
@@ -257,8 +306,7 @@ async function bootstrap() {
           renderCurrentView();
         },
         onTrackOrder: () => {
-          state.currentView = 'orders';
-          renderCurrentView();
+          void openOrdersView();
         }
       });
       return;
@@ -286,6 +334,11 @@ async function bootstrap() {
   }
 
   bindBottomNavigation(appRoot, (targetView) => {
+    if (targetView === 'orders') {
+      void openOrdersView();
+      return;
+    }
+
     state.currentView = targetView;
     renderCurrentView();
   });
@@ -301,6 +354,14 @@ async function bootstrap() {
 
     const articles = await fetchArticles();
     state.articles = sortArticles(articles);
+
+    if (state.orders.length) {
+      try {
+        await syncOrdersFromStorageWithDatabase();
+      } catch {
+        // Keep the app usable even if stored order synchronization fails at startup.
+      }
+    }
 
     stopLoading();
     renderCurrentView();
