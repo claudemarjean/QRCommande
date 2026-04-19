@@ -224,7 +224,8 @@ async function bootstrap() {
           state.currentView = 'menu';
           persistCart(state.cart);
           renderCurrentView();
-        }
+        },
+        onTrackOrder: () => {}
       });
       return;
     }
@@ -248,6 +249,10 @@ async function bootstrap() {
           state.checkout.tableLabel = '';
           state.checkout.lastOrder = null;
           state.currentView = 'menu';
+          renderCurrentView();
+        },
+        onTrackOrder: () => {
+          state.currentView = 'orders';
           renderCurrentView();
         }
       });

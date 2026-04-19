@@ -806,10 +806,16 @@ export function renderOrderConfirmation(screenRoot, order) {
               <strong class="confirmation-detail-value">${orderTime}</strong>
             </div>
           </div>
-          <button type="button" data-new-order class="confirmation-action" data-confirmation-reveal>
-            <i class="fa-solid fa-rotate-right"></i>
-            Nouvelle commande
-          </button>
+          <div class="confirmation-actions" data-confirmation-reveal>
+            <button type="button" data-track-order class="confirmation-secondary-action">
+              <i class="fa-solid fa-receipt"></i>
+              Suivre ma commande
+            </button>
+            <button type="button" data-new-order class="confirmation-action">
+              <i class="fa-solid fa-rotate-right"></i>
+              Nouvelle commande
+            </button>
+          </div>
         </section>
       </div>
     </div>
@@ -902,7 +908,7 @@ export function bindMenuActions(screenRoot, onAddToCart) {
   });
 }
 
-export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout, onNewOrder, onTableLabelChange }) {
+export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClearCart, onUpdateQuantity, onCheckout, onNewOrder, onTrackOrder, onTableLabelChange }) {
   if (screenRoot.__cartClickHandler) {
     screenRoot.removeEventListener('click', screenRoot.__cartClickHandler);
   }
@@ -944,6 +950,12 @@ export function bindCartActions(screenRoot, { onRemoveItem, onBackToMenu, onClea
     const newOrderButton = event.target.closest('[data-new-order]');
     if (newOrderButton) {
       onNewOrder();
+      return;
+    }
+
+    const trackOrderButton = event.target.closest('[data-track-order]');
+    if (trackOrderButton) {
+      onTrackOrder();
       return;
     }
   };
